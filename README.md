@@ -108,8 +108,15 @@ de prueba y `?nohud=1` oculta el HUD.
 
 ## Despliegue
 
-Cada push a `main` lanza `.github/workflows/pages.yml`: instala dependencias, compila con
-`npm run build` y publica `dist/` en GitHub Pages.
+El sitio se publica en GitHub Pages desde la rama `gh-pages`:
+
+```bash
+npm run deploy
+```
+
+Ese comando compila `dist/` y la sube a `gh-pages` con `gh-pages`.
+También se puede publicar con una acción de GitHub Actions; si tu token de `gh` tiene
+el scope `workflow`, basta con añadir un workflow que compile y suba `dist/`.
 
 ## Licencia
 

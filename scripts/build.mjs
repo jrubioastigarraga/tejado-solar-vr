@@ -33,4 +33,7 @@ for (const [from, to] of staticFiles) {
   await cp(src, path.join(dist, to));
 }
 
+// evita que GitHub Pages procese el sitio con Jekyll
+await cp(path.join(root, 'public/.nojekyll'), path.join(dist, '.nojekyll')).catch(() => {});
+
 console.log('Build listo en dist/');

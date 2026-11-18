@@ -8,13 +8,15 @@
     "build": "node scripts/build.mjs",
     "dev": "node scripts/dev.mjs",
     "serve": "node scripts/serve.mjs",
-    "shot": "node scripts/shot.mjs"
+    "shot": "node scripts/shot.mjs",
+    "deploy": "npm run build && gh-pages -d dist -m \"Publicar en GitHub Pages\""
   },
   "dependencies": {
     "three": "0.187.0"
   },
   "devDependencies": {
     "esbuild": "0.28.2",
+    "gh-pages": "^6.3.0",
     "puppeteer-core": "^25.0.2"
   }
 }
