@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1220" />
+    <title>Tejado Solar VR · Instalación de placas solares</title>
+    <meta
+      name="description"
+      content="Simulador WebXR realista de instalación de paneles solares: EPIs, cubierta, guías, sombras y energía. Three.js, para Pico 4 y navegador."
+    />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <canvas id="scene" aria-label="Escena 3D del juego"></canvas>
+
+    <div id="loading" role="status">
+      <div class="spinner"></div>
+      <p>Cargando la obra…</p>
+    </div>
+
+    <div id="hud" class="hidden" aria-live="polite">
+      <div class="hud-top">
+        <div class="hud-card brand">
+          <span class="logo" aria-hidden="true"></span>
+          <div>
+            <strong>SOLARIS</strong><span>instalaciones</span>
+          </div>
+        </div>
+        <div class="hud-card objective">
+          <span class="eyebrow" id="phase-name">FASE 1 · SEGURIDAD</span>
+          <p id="objective">Ponte el EPI antes de subir a cubierta.</p>
+        </div>
+        <div class="hud-card stats">
+          <div><b id="stat-panels">0</b><span>paneles</span></div>
+          <div><b id="stat-kwp">0,00</b><span>kWp</span></div>
+          <div><b id="stat-kwh">0</b><span>kWh/año</span></div>
+        </div>
+      </div>
+
+      <div class="hud-bottom">
+        <div class="hud-card ppe" id="ppe-chips">
+          <span class="eyebrow">EPI</span>
+          <span class="chip" data-ppe="helmet">Casco</span>
+          <span class="chip" data-ppe="goggles">Gafas</span>
+          <span class="chip" data-ppe="gloves">Guantes</span>
+          <span class="chip" data-ppe="harness">Arnés</span>
+        </div>
+        <div class="hud-card hint" id="hint">
+          <span class="key">WASD</span> mover · <span class="key">Ratón</span> mirar ·
+          <span class="key">Clic</span> coger/soltar · <span class="key">E</span> equipar ·
+          <span class="key">Esc</span> soltar
+        </div>
+      </div>
+
+      <div id="toast" role="status"></div>
+      <div id="crosshair" aria-hidden="true"></div>
+    </div>
+
+    <div id="intro">
+      <div class="intro-glow" aria-hidden="true"></div>
+      <div class="intro-card">
+        <header>
+          <div class="kicker"><span class="dot"></span> WebXR · Three.js · Pico 4</div>
+          <h1>TEJADO<br /><em>SOLAR</em> VR</h1>
+          <p class="tagline">
+            Ponte el EPI, sube a cubierta y monta la instalación fotovoltaica. Un simulador
+            realista con sombras, guías de anclaje y producción anual estimada.
+          </p>
+        </header>
+
+        <div class="intro-grid">
+          <div class="intro-block">
+            <h2>La misión</h2>
+            <ul>
+              <li><b>1.</b> Equipa casco, gafas, guantes y arnés en la mesa de obra.</li>
+              <li><b>2.</b> Sube a la cubierta con la línea de vida enganchada.</li>
+              <li><b>3.</b> Coloca al menos 8 paneles sobre las guías del faldón sur.</li>
+              <li><b>4.</b> Evita la sombra del árbol y la chimenea y certifica el sistema.</li>
+            </ul>
+          </div>
+          <div class="intro-block">
+            <h2>Controles</h2>
+            <ul>
+              <li><b>Pico 4:</b> gatillo coger/soltar · sticks mover y girar · A/X equipar.</li>
+              <li><b>Pantalla:</b> WASD + ratón · clic coger/soltar · E equipar el EPI.</li>
+              <li>Acerca el panel a una guía hasta que el marco se ponga verde y suelta.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="intro-actions">
+          <button id="btn-vr" class="btn primary" type="button">
+            <span class="vr-icon" aria-hidden="true">◉</span> Entrar en VR
+          </button>
+          <button id="btn-flat" class="btn" type="button">Jugar en pantalla</button>
+        </div>
+        <p id="vr-note" class="note">
+          En Pico 4 abre esta página en el navegador del visor y pulsa «Entrar en VR».
+          Requiere HTTPS (GitHub Pages lo incluye).
+        </p>
+
+        <footer>
+          <span>Proyecto didáctico de FP · energía solar y prevención de riesgos</span>
+          <a href="https://github.com/jrubioastigarraga/tejado-solar-vr" target="_blank" rel="noopener">GitHub ↗</a>
+        </footer>
+      </div>
+    </div>
+
+    <div id="results" class="hidden" role="dialog" aria-modal="true" aria-labelledby="results-title">
+      <div class="results-card">
+        <span class="eyebrow">CERTIFICADO DE INSTALACIÓN</span>
+        <h2 id="results-title">Instalación completada</h2>
+        <div class="stars" id="results-stars" aria-hidden="true"></div>
+        <div class="score-row">
+          <div class="score"><b id="res-total">0</b><span>/ 100 puntos</span></div>
+          <div class="res-metrics">
+            <div><b id="res-kwp">0</b><span>kWp instalados</span></div>
+            <div><b id="res-kwh">0</b><span>kWh/año</span></div>
+            <div><b id="res-money">0</b><span>€/año ahorrados</span></div>
+            <div><b id="res-co2">0</b><span>kg CO₂/año</span></div>
+          </div>
+        </div>
+        <ul class="res-breakdown" id="res-breakdown"></ul>
+        <p class="res-note" id="res-note"></p>
+        <div class="intro-actions">
+          <button id="btn-restart" class="btn primary" type="button">Volver a empezar</button>
+          <button id="btn-close-results" class="btn" type="button">Ver la cubierta</button>
+        </div>
+      </div>
+    </div>
+
+    <noscript>Este juego necesita JavaScript y WebGL.</noscript>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
