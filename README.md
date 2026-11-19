@@ -13,6 +13,25 @@ producción anual estimada, el ahorro y la nota de la obra.
 
 ## Jugar en Pico 4
 
+### Opción A · APK (recomendada, sin navegador)
+
+Descarga **[TejadoSolarVR-pico4.apk](https://github.com/jrubioastigarraga/tejado-solar-vr/releases/latest/download/TejadoSolarVR-pico4.apk)**
+e instálala en el visor. La APK lleva dentro la escena, Three.js y un servidor local, así que
+funciona sin Internet. Al abrirla se lanza el navegador del Pico con la experiencia ya cargada
+(pulsa **Entrar en VR**). Si el navegador no arranca solo, la pantalla de la app tiene
+**Entrar en VR (navegador)**, **Elegir navegador…** y **Ver en 2D**.
+
+Instalación por USB:
+
+```powershell
+adb install -r TejadoSolarVR-pico4.apk
+```
+
+Luego en el visor: **Biblioteca → Desconocidas → Tejado Solar VR**.
+La APK está firmada con una clave propia (`android/app/keystore/tejadosolar.jks`).
+
+### Opción B · Navegador
+
 1. Conecta el visor a Internet y abre el **navegador del Pico 4**.
 2. Entra en <https://jrubioastigarraga.github.io/tejado-solar-vr/>.
 3. Pulsa **Entrar en VR** y acepta la sesión inmersiva.
@@ -79,6 +98,27 @@ npm run build   # genera dist/ listo para publicar
 
 Sin frameworks: **Three.js** (WebXR), módulos ES y `esbuild`. Todo el arte es procedural,
 así que no hay que descargar modelos ni texturas.
+
+### APK para Pico 4
+
+El contenedor Android está en `android/`. Es un lanzador que:
+
+1. Sirve la web compilada (`dist/`) desde un **servidor HTTP local** en `127.0.0.1:8741`
+   (contexto seguro para WebXR, sin Internet).
+2. Abre el **navegador del visor** con un `Intent`, que es quien aporta la sesión inmersiva.
+3. Mantiene el servidor vivo con un **servicio en primer plano**.
+4. Incluye un **modo 2D** en WebView como respaldo.
+
+```powershell
+cd android
+.\build.ps1             # npm run build + APK firmada en ..\release\TejadoSolarVR-pico4.apk
+.\build.ps1 -Install    # además la instala por adb
+.\build.ps1 -SkipWeb    # reutiliza dist/
+```
+
+Requiere JDK 17/21 y Android SDK (platform 34). Los assets se copian solos con la tarea
+Gradle `syncWebAssets`. La firma está en `android/app/keystore/tejadosolar.jks`
+(alias y clave `tejadosolar`); consérvala para que las actualizaciones se instalen encima.
 
 ```
 index.html            interfaz de inicio, HUD y resultados

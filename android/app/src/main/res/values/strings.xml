@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tejado Solar VR</string>
+    <string name="title">SOLARIS · TEJADO SOLAR VR</string>
+    <string name="subtitle">Instalación fotovoltaica en Pico 4</string>
+    <string name="intro">Juego WebXR de instalación de paneles solares: ponte el EPI, sube a la cubierta, monta los paneles sobre las guías y certifica la instalación. La escena se sirve desde este mismo visor, sin conexión a Internet.</string>
+    <string name="status_ok">Servidor local activo en %1$s</string>
+    <string name="status_error">No se pudo arrancar el servidor local (puerto ocupado). Reinicia la app.</string>
+    <string name="btn_vr">Entrar en VR (navegador)</string>
+    <string name="btn_chooser">Elegir navegador…</string>
+    <string name="btn_2d">Ver en 2D dentro de la app</string>
+    <string name="choose_browser">Abrir Tejado Solar VR con…</string>
+    <string name="no_browser">No hay navegador instalado: se abre en modo 2D.</string>
+    <string name="webview_note">Modo 2D: el WebView no soporta WebXR inmersivo. Para VR usa el navegador del visor.</string>
+    <string name="close">Cerrar</string>
+    <string name="channel_name">Servidor local VR</string>
+    <string name="channel_desc">Mantiene activa la escena WebXR mientras juegas en el navegador.</string>
+    <string name="notif_text">Tejado Solar VR disponible en el navegador</string>
+    <string name="steps">Pico 4: abre la app → se lanza el navegador → pulsa Entrar en VR → acepta el permiso de seguimiento → gatillo: coger/soltar · stick izquierdo: moverte · stick derecho: girar.</string>
+    <string name="offline">La web y Three.js van empaquetados dentro del APK: funciona sin Internet. Solo se necesita el navegador del Pico para la sesión inmersiva.</string>
+    <string name="footer">Proyecto didáctico de FP · Jon Rubio · Three.js (MIT) · CC BY-NC-SA 4.0</string>
+</resources>

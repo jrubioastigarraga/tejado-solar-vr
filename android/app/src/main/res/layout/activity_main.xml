@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0b1220"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="28dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/title"
+            android:textColor="#ffc247"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/subtitle"
+            android:textColor="#eef1f5"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/intro"
+            android:textColor="#a7b1bd"
+            android:textSize="14sp"
+            android:lineSpacingMultiplier="1.2" />
+
+        <TextView
+            android:id="@+id/status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:fontFamily="monospace"
+            android:textColor="#a7b1bd"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btnVr"
+            style="@style/TejadoButtonPrimary"
+            android:text="@string/btn_vr" />
+
+        <Button
+            android:id="@+id/btnChooser"
+            style="@style/TejadoButton"
+            android:text="@string/btn_chooser" />
+
+        <Button
+            android:id="@+id/btn2d"
+            style="@style/TejadoButton"
+            android:text="@string/btn_2d" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="@string/steps"
+            android:textColor="#a7b1bd"
+            android:textSize="13sp"
+            android:lineSpacingMultiplier="1.25" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/offline"
+            android:textColor="#5f6b78"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="@string/footer"
+            android:textColor="#5f6b78"
+            android:textSize="11sp" />
+    </LinearLayout>
+</ScrollView>

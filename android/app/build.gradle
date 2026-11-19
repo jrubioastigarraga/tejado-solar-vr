@@ -1,0 +1,66 @@
+plugins {
+    id 'com.android.application'
+}
+
+def webDist = file("$rootDir/../dist")
+def generatedAssets = layout.buildDirectory.dir("generated/webAssets")
+
+android {
+    namespace 'eus.usurbil.tejadosolar'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'eus.usurbil.tejadosolar'
+        minSdk 29
+        targetSdk 34
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('keystore/tejadosolar.jks')
+            storePassword 'tejadosolar'
+            keyAlias 'tejadosolar'
+            keyPassword 'tejadosolar'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            shrinkResources false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    aaptOptions {
+        noCompress 'html', 'js', 'css', 'json', 'svg'
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs += [generatedAssets.get().asFile]
+        }
+    }
+}
+
+// Copia la web compilada (dist/) dentro de los assets del APK.
+tasks.register('syncWebAssets', Copy) {
+    from(webDist) {
+        include '**/*'
+    }
+    into(generatedAssets.map { it.dir('site') })
+}
+
+tasks.matching { it.name == 'preBuild' }.configureEach {
+    dependsOn 'syncWebAssets'
+}
+tasks.matching { it.name.startsWith('merge') && it.name.endsWith('Assets') }.configureEach {
+    dependsOn 'syncWebAssets'
+}

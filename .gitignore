@@ -1,6 +1,12 @@
 node_modules/
 dist/
+release/
 *.log
 shot.png
 .DS_Store
 Thumbs.db
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/
+android/app/src/main/assets/site/

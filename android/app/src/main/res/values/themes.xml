@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.TejadoSolar" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#0b1220</item>
+        <item name="android:colorAccent">#ffc247</item>
+        <item name="android:statusBarColor">#0b1220</item>
+        <item name="android:navigationBarColor">#0b1220</item>
+    </style>
+
+    <style name="TejadoButton" parent="@android:style/Widget.Material.Button">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">10dp</item>
+        <item name="android:paddingTop">14dp</item>
+        <item name="android:paddingBottom">14dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:backgroundTint">#1b2a3b</item>
+        <item name="android:textColor">#eef1f5</item>
+    </style>
+
+    <style name="TejadoButtonPrimary" parent="TejadoButton">
+        <item name="android:backgroundTint">#ffb52e</item>
+        <item name="android:textColor">#20160a</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+</resources>
