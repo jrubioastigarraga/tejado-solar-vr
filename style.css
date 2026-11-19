@@ -269,6 +269,21 @@ h1 em {
   transform: none;
 }
 
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.note a {
+  color: #9dc0e6;
+}
+
+.note a:hover {
+  color: #fff;
+}
+
 .vr-icon {
   display: inline-block;
   margin-right: 4px;
