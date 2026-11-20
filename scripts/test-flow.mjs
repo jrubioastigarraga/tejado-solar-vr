@@ -66,6 +66,38 @@ const out = await page.evaluate(async () => {
   g.debugPlace(12);
   await sleep(500);
   res.placedTotal = g.solar.state.placed;
+
+  // conexión eléctrica: el interruptor no debe dejar arrancar sin cable
+  res.switchWithoutWiring = g.electrical.activateSwitch();
+  res.electricalBefore = { ...g.electrical.state };
+
+  // soltar un conector sobre su toma debe conectarlo
+  const peConn = g.electrical.connectables[1];
+  const holder = g.player.controllers[0].controller;
+  const grabbed = g.electrical.beginHold(peConn.item, holder);
+  g.player.rig.updateMatrixWorld(true);
+  window.__scene.attach(peConn.item);
+  peConn.item.position.copy(peConn.socket);
+  peConn.item.updateMatrixWorld(true);
+  g.electrical.release(peConn.item);
+  res.groundedByRelease = grabbed && g.electrical.state.grounded;
+  g.debugConnect();
+  res.electricalAfter = {
+    wired: g.electrical.state.wired,
+    grounded: g.electrical.state.grounded,
+    on: g.electrical.state.on,
+  };
+
+  // limpieza de un panel con polvo
+  res.dusty = g.solar.state.dusty;
+  const dirty = g.solar.dustyPanels()[0];
+  if (dirty) {
+    const before = g.solar.state.annualKwh;
+    g.solar.cleanPanel(dirty);
+    res.cleaned = { before, after: g.solar.state.annualKwh, remaining: g.solar.state.dusty };
+  }
+
+  await sleep(300);
   g.finish();
   await sleep(500);
   res.phaseEnd = g.state.phase;

@@ -64,12 +64,20 @@ clic coger/soltar · `E` equipar el EPI apuntado · `Esc` soltar.
    la cubierta. El arnés queda unido a la línea de vida del anclaje de cumbrera.
 3. **Montaje.** Coge paneles del stock (16 unidades, 450 Wp) y acércalos a las guías.
    Cuando el marco del panel se pone verde, suelta: queda fijado. Puedes retirar uno ya
-   montado cogiéndolo de nuevo.
+   montado cogiéndolo de nuevo. Algunos huecos traen **polvo**: coge el cepillo del andamio
+   y frótalo sobre el panel para recuperar su rendimiento.
 4. **Sombra.** El faldón tiene 15 huecos; la chimenea ocupa 2. El árbol del jardín proyecta
    sombra sobre dos huecos del extremo oeste: producen aproximadamente la mitad. El HUD de
    muñeca muestra la sombra y los kWh/año del hueco que estás apuntando.
-5. **Certificación.** Con un mínimo de 8 paneles, pulsa **CERTIFICAR** en el cuadro del
-   andamio. Obtienes estrellas, kWp, kWh/año, ahorro y CO₂ evitado.
+5. **Conexión (fase 3).** Coge el conector rojo de la bobina y llévalo a la toma DC del
+   cuadro eléctrico; después conecta el conector verde de **puesta a tierra**. La pantalla
+   del inversor indica la conexión parcial.
+6. **Puesta en marcha.** Acciona el **interruptor de corte** del cuadro. El piloto pasa a
+   verde y el LCD muestra la potencia instantánea; sin este paso no se puede certificar.
+7. **Certificación.** Con un mínimo de 8 paneles y el sistema en marcha, pulsa
+   **CERTIFICAR** en el cuadro del andamio. Obtienes estrellas, kWp, kWh/año, ahorro y CO₂
+   evitado. La nota reparte 25 puntos de seguridad, 30 de montaje, 20 de rendimiento,
+   15 de conexión y 10 de remate.
 
 ![Montaje sobre la cubierta](docs/cubierta.jpg)
 ![Mesa de EPI](docs/epi.jpg)
@@ -83,7 +91,10 @@ clic coger/soltar · `E` equipar el EPI apuntado · `Esc` soltar.
 - Sombras reales (sol del suroeste) y cálculo por hueco con **1.350 kWh/kWp·año**.
 - Precio de la luz **0,16 €/kWh** y factor de emisión **0,158 kg CO₂/kWh** (valores didácticos).
 - EPI, línea de vida, andamio con barandilla y rodapié, prohibición de trabajar sin protección.
-- Sonido procedural (sin archivos externos), materiales PBR y texturas generadas por canvas.
+- Conexión DC, puesta a tierra, interruptor de corte y comprobación de producción.
+- Suciedad en los paneles (reduce la producción) y limpieza con cepillo.
+- Sonido procedural (sin archivos externos), materiales PBR, texturas generadas por canvas y
+  **mapas normales** derivados de las mismas para dar relieve a tejas, piedra, madera y terreno.
 
 > Es un proyecto **didáctico**: los valores energéticos son orientativos y no sustituyen un
 > estudio de sombras, un cálculo de estructuras ni la formación real en prevención de riesgos.
@@ -146,7 +157,8 @@ src/main.js           renderer, arranque, sesión XR y bucle
 src/player.js         rig VR, mandos, locomoción, giro y modo ratón/teclado
 src/house.js          casa, cubierta, guías, ventanas y chimenea
 src/world.js          cielo, sol, terreno, árboles, andamio, EPI y cuadro de obra
-src/solar.js          paneles, huecos, retícula, colocación y energía
+src/solar.js          paneles, huecos, retícula, colocación, polvo y energía
+src/electrical.js     bobina, cable DC, puesta a tierra, interruptor y producción
 src/ppe.js            equipos de protección y comprobaciones
 src/interactions.js   rayos de los mandos y pulsadores
 src/hud.js            HUD DOM y paneles 3D (muñeca, cartel, avisos, modales)
@@ -163,8 +175,9 @@ foveación fija (0,65) al entrar en VR.
 ### Depuración
 
 `?skipintro=1` entra directamente. `?view=drone`, `?view=roof`, `?view=platform`,
-`?view=bench` o `?view=results` colocan la cámara de revisión. `?panels=9` monta paneles
-de prueba y `?nohud=1` oculta el HUD.
+`?view=bench`, `?view=electrical` o `?view=results` colocan la cámara de revisión.
+`?panels=9` monta paneles de prueba, `?electrical` conecta y arranca el sistema, y
+`?nohud=1` oculta el HUD.
 
 ## Despliegue
 

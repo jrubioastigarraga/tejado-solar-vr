@@ -1,7 +1,17 @@
 import * as THREE from 'three';
 import { ENERGY, PANEL, SITE } from './config.js';
 
-export function createGame({ player, solar, ppe, hud, world, interactions, audio }) {
+export function createGame({
+  scene,
+  player,
+  solar,
+  ppe,
+  hud,
+  world,
+  interactions,
+  audio,
+  electrical,
+}) {
   const state = {
     phase: 'epi',
     started: false,
@@ -24,6 +34,8 @@ export function createGame({ player, solar, ppe, hud, world, interactions, audio
   const _b = new THREE.Vector3();
   const _dir = new THREE.Vector3();
   const _up = new THREE.Vector3(0, 1, 0);
+  const _brushPos = new THREE.Vector3();
+  const _panelPos = new THREE.Vector3();
 
   function updateLifeline() {
     const active = ppe.equipped.harness && player.onRoof();
@@ -39,6 +51,23 @@ export function createGame({ player, solar, ppe, hud, world, interactions, audio
     lifeline.quaternion.setFromUnitVectors(_up, _dir.normalize());
   }
 
+  /* ------------------------------------------------------ cepillo de limpieza */
+  function updateCleaning(dt) {
+    const brush = world.brush;
+    if (brush.userData.state !== 'held') return;
+    brush.getWorldPosition(_brushPos);
+    for (const panel of solar.dustyPanels()) {
+      panel.getWorldPosition(_panelPos);
+      if (_brushPos.distanceTo(_panelPos) > 0.82) continue;
+      panel.userData.cleanT = (panel.userData.cleanT || 0) + dt;
+      if (panel.userData.cleanT >= 0.3) {
+        panel.userData.cleanT = 0;
+        solar.cleanPanel(panel);
+      }
+      break;
+    }
+  }
+
   const phaseInfo = {
     epi: {
       name: 'FASE 1 · SEGURIDAD',
@@ -47,6 +76,10 @@ export function createGame({ player, solar, ppe, hud, world, interactions, audio
     install: {
       name: 'FASE 2 · MONTAJE',
       objective: 'Coge un panel del stock y acércalo a una guía del faldón sur. Suelta cuando se ponga verde.',
+    },
+    connection: {
+      name: 'FASE 3 · CONEXIÓN',
+      objective: 'Conecta el cable DC y la puesta a tierra en el cuadro eléctrico del andamio.',
     },
     done: {
       name: 'OBRA CERTIFICADA',
@@ -60,19 +93,41 @@ export function createGame({ player, solar, ppe, hud, world, interactions, audio
       kwp: solar.state.kwp,
       kwh: solar.state.annualKwh,
       shadeAvg: solar.state.shadeAvg,
+      efficiency: solar.state.efficiency,
+      dusty: solar.state.dusty,
       available: solar.state.available,
       validSlots: solar.validSlots,
       ppe: { ...ppe.equipped },
       phase: state.phase,
+      wired: electrical.state.wired,
+      grounded: electrical.state.grounded,
+      powered: electrical.state.on,
     });
     const kw = solar.state.kwp.toLocaleString('es-ES', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+    const instant = electrical.state.instantKw.toLocaleString('es-ES', {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    });
+    let footer = 'sin conexión';
+    if (electrical.state.on) footer = `EN MARCHA · ${instant} kW`;
+    else if (electrical.state.wired || electrical.state.grounded) footer = 'conexión parcial';
     world.setLcd(
       [`${kw} kWp`, `${solar.state.annualKwh.toLocaleString('es-ES')} kWh/año`],
       solar.state.placed ? '#46d99b' : '#6f8d7f',
+      footer,
     );
+  }
+
+  function advancePhase() {
+    if (state.phase !== 'install') return;
+    if (solar.state.placed < ENERGY.minPanels) return;
+    state.phase = 'connection';
+    lastObjective = '';
+    audio.success();
+    hud.toast('Montaje suficiente. Ahora conecta y pon en marcha la instalación.', 'ok');
   }
 
   let lastObjective = '';
@@ -84,9 +139,25 @@ export function createGame({ player, solar, ppe, hud, world, interactions, audio
       }
     } else if (state.phase === 'install') {
       if (solar.state.placed >= solar.validSlots) {
-        objective = 'Todos los huecos útiles cubiertos. Baja al andamio y certifica la instalación.';
+        objective = 'Todos los huecos útiles cubiertos. Prepara la conexión eléctrica.';
       } else if (solar.state.placed >= ENERGY.minPanels) {
-        objective = 'Mínimo alcanzado. Puedes certificar en el cuadro del andamio o seguir montando.';
+        objective = 'Mínimo alcanzado. Puedes seguir montando o pasar a la conexión.';
+      } else if (solar.state.dusty > 0) {
+        objective = `Coge el cepillo del andamio y limpia los ${solar.state.dusty} paneles con polvo.`;
+      }
+    } else if (state.phase === 'connection') {
+      if (solar.state.placed < ENERGY.minPanels) {
+        objective = `Faltan paneles (${solar.state.placed}/${ENERGY.minPanels}): vuelve a montar para poder certificar.`;
+      } else if (solar.state.dusty > 0) {
+        objective = `Quedan ${solar.state.dusty} paneles con polvo. Cepíllalos para recuperar rendimiento.`;
+      } else if (!electrical.state.wired) {
+        objective = 'Conecta el cable DC de la bobina a la toma roja del cuadro eléctrico.';
+      } else if (!electrical.state.grounded) {
+        objective = 'Conecta la puesta a tierra (cable verde) a la toma del cuadro.';
+      } else if (!electrical.state.on) {
+        objective = 'Acciona el interruptor de corte del cuadro para poner el sistema en marcha.';
+      } else {
+        objective = 'Sistema en marcha. Pulsa CERTIFICAR en el cuadro de la instalación.';
       }
     }
     if (objective !== lastObjective) {
@@ -97,6 +168,7 @@ export function createGame({ player, solar, ppe, hud, world, interactions, audio
 
   function refreshAll() {
     sync();
+    advancePhase();
     updateObjective();
   }
 
@@ -124,6 +196,42 @@ export function createGame({ player, solar, ppe, hud, world, interactions, audio
     });
   }
 
+  for (const c of electrical.connectables) {
+    interactions.registerGrab(c.item, {
+      type: 'connector',
+      maxDistance: 3.2,
+      hoverScale: 1.06,
+      enabled: () => !c.item.userData.connected,
+      onGrab: (root, holder) => electrical.beginHold(root, holder),
+      onRelease: (root) => electrical.release(root),
+    });
+  }
+
+  const brush = world.brush;
+  interactions.registerGrab(brush, {
+    type: 'brush',
+    maxDistance: 2.9,
+    hoverScale: 1.08,
+    onGrab: (root, holder) => {
+      root.userData.state = 'held';
+      root.userData.cleanT = 0;
+      holder.attach(root);
+      root.position.set(0, -0.05, -0.24);
+      root.quaternion.identity();
+      root.scale.setScalar(0.9);
+      audio.pick();
+      hud.toast('Cepillo en mano: frótalo sobre los paneles con polvo.', '');
+      return true;
+    },
+    onRelease: (root) => {
+      root.userData.state = 'free';
+      scene.attach(root);
+      root.position.copy(brush.userData.basePos);
+      root.quaternion.copy(brush.userData.baseQuat);
+      root.scale.setScalar(1);
+    },
+  });
+
   interactions.registerButton(
     world.accessPedestal,
     () => accessRoof(),
@@ -135,6 +243,11 @@ export function createGame({ player, solar, ppe, hud, world, interactions, audio
     () => finish(),
     { maxDistance: 4.0, hoverScale: 1 },
   );
+
+  interactions.registerButton(electrical.switchButton, () => electrical.activateSwitch(), {
+    maxDistance: 3.2,
+    hoverScale: 1.04,
+  });
 
   interactions.registerButton(
     hud.modalButton,
@@ -157,7 +270,7 @@ export function createGame({ player, solar, ppe, hud, world, interactions, audio
       hud.toast('Ya estás en la cubierta.', '');
       return;
     }
-    state.phase = 'install';
+    if (state.phase === 'epi') state.phase = 'install';
     lastObjective = '';
     player.teleport(0.15, 5.2, 0);
     refreshAll();
@@ -169,13 +282,18 @@ export function createGame({ player, solar, ppe, hud, world, interactions, audio
     const placed = solar.state.placed;
     const valid = solar.validSlots;
     const shade = solar.state.shadeAvg;
+    const efficiency = placed ? solar.state.efficiency : 0;
     const ppeCount = ppe.count();
 
     const safety = ppeCount * 5 + (ppe.isComplete() ? 5 : 0); // 25
-    const mounting = Math.min(placed / valid, 1) * 40;
-    const performance = (placed ? shade : 0) * 25;
+    const mounting = Math.min(placed / valid, 1) * 30;
+    const performance = efficiency * 20;
+    const electricalScore =
+      (electrical.state.wired ? 6 : 0) +
+      (electrical.state.grounded ? 4 : 0) +
+      (electrical.state.on ? 5 : 0);
     const finishBonus = placed >= valid ? 10 : placed >= ENERGY.minPanels ? 5 : 0;
-    const total = Math.round(safety + mounting + performance + finishBonus);
+    const total = Math.round(safety + mounting + performance + electricalScore + finishBonus);
     const stars = total >= 88 ? 5 : total >= 74 ? 4 : total >= 58 ? 3 : total >= 40 ? 2 : 1;
 
     const kwp = placed * (PANEL.watts / 1000);
@@ -195,8 +313,14 @@ export function createGame({ player, solar, ppe, hud, world, interactions, audio
     if (shade < 0.9) {
       note = 'Parte de los paneles están bajo la sombra del árbol: producen hasta un 50 % menos.';
     }
+    if (solar.state.dusty > 0) {
+      note = `Quedan ${solar.state.dusty} paneles con polvo: la suciedad reduce la producción.`;
+    }
     if (placed < ENERGY.minPanels) {
       note = `Solo ${placed} paneles: la instalación no llega al mínimo de ${ENERGY.minPanels} para certificar.`;
+    }
+    if (!electrical.state.on && placed >= ENERGY.minPanels) {
+      note = 'La instalación no se ha puesto en marcha: falta la conexión o el interruptor de corte.';
     }
 
     return {
@@ -210,10 +334,14 @@ export function createGame({ player, solar, ppe, hud, world, interactions, audio
       note,
       breakdown: [
         { label: 'Seguridad y EPI', value: `${Math.round(safety)} / 25` },
-        { label: `Montaje (${placed}/${valid} paneles)`, value: `${Math.round(mounting)} / 40` },
+        { label: `Montaje (${placed}/${valid} paneles)`, value: `${Math.round(mounting)} / 30` },
         {
-          label: `Rendimiento (sombra media ${Math.round((1 - shade) * 100)}%)`,
-          value: `${Math.round(performance)} / 25`,
+          label: `Rendimiento (${Math.round(efficiency * 100)} % de la irradiancia)`,
+          value: `${Math.round(performance)} / 20`,
+        },
+        {
+          label: `Conexión y puesta en marcha (${electrical.state.on ? 'en marcha' : 'parada'})`,
+          value: `${electricalScore} / 15`,
         },
         { label: 'Certificación y remate', value: `${finishBonus} / 10` },
       ],
@@ -235,6 +363,11 @@ export function createGame({ player, solar, ppe, hud, world, interactions, audio
       audio.error();
       return;
     }
+    if (!electrical.state.on) {
+      hud.toast('Antes de certificar, conecta el cable DC, la tierra y acciona el interruptor.', 'err');
+      audio.error();
+      return;
+    }
     state.phase = 'done';
     lastObjective = '';
     refreshAll();
@@ -247,6 +380,12 @@ export function createGame({ player, solar, ppe, hud, world, interactions, audio
   function reset() {
     solar.reset();
     ppe.reset();
+    electrical.reset();
+    brush.userData.state = 'free';
+    scene.attach(brush);
+    brush.position.copy(brush.userData.basePos);
+    brush.quaternion.copy(brush.userData.baseQuat);
+    brush.scale.setScalar(1);
     state.phase = 'epi';
     lastObjective = '';
     player.teleport(SITE.start.x, SITE.start.z, 0);
@@ -298,8 +437,12 @@ export function createGame({ player, solar, ppe, hud, world, interactions, audio
     player,
     world,
     interactions,
+    electrical,
     start,
-    update: updateLifeline,
+    update: (dt) => {
+      updateLifeline();
+      updateCleaning(dt);
+    },
     accessRoof,
     finish,
     reset,
@@ -315,10 +458,14 @@ export function createGame({ player, solar, ppe, hud, world, interactions, audio
       solar.debugPlace(n);
       refreshAll();
     },
+    debugConnect() {
+      electrical.debugConnect();
+      refreshAll();
+    },
     goTo(x, z, yaw = 0) {
       player.teleport(x, z, yaw);
       if (player.groundHeightAt(x, z) > 2) {
-        state.phase = 'install';
+        if (state.phase === 'epi') state.phase = 'install';
         lastObjective = '';
       }
       refreshAll();

@@ -37,50 +37,68 @@ export function createHouse(textures) {
   const stuccoMap = cloneRepeat(textures.stucco, 6, 1.5);
   const stuccoMat = new THREE.MeshStandardMaterial({
     map: stuccoMap,
+    normalMap: cloneRepeat(textures.normal.stucco, 6, 1.5),
+    normalScale: new THREE.Vector2(0.55, 0.55),
     color: 0xf3ece0,
     roughness: 0.92,
     metalness: 0,
   });
   const gableMat = new THREE.MeshStandardMaterial({
     map: cloneRepeat(textures.stucco, 2.6, 0.9),
+    normalMap: cloneRepeat(textures.normal.stucco, 2.6, 0.9),
+    normalScale: new THREE.Vector2(0.55, 0.55),
     color: 0xefe7da,
     roughness: 0.94,
     side: THREE.DoubleSide,
   });
   const stoneMat = new THREE.MeshStandardMaterial({
     map: cloneRepeat(textures.stone, 8, 0.7),
+    normalMap: cloneRepeat(textures.normal.stone, 8, 0.7),
+    normalScale: new THREE.Vector2(1.15, 1.15),
     color: 0xcfc6b6,
     roughness: 0.95,
   });
   const roofMat = new THREE.MeshStandardMaterial({
     map: cloneRepeat(textures.roof, 11, 3.2),
+    normalMap: cloneRepeat(textures.normal.roof, 11, 3.2),
+    normalScale: new THREE.Vector2(1.2, 1.2),
     color: 0xefe0d6,
-    roughness: 0.92,
+    roughness: 0.9,
     metalness: 0.02,
   });
   const roofMatNorth = new THREE.MeshStandardMaterial({
     map: cloneRepeat(textures.roof, 11, 3.2),
+    normalMap: cloneRepeat(textures.normal.roof, 11, 3.2),
+    normalScale: new THREE.Vector2(1.2, 1.2),
     color: 0xd9c4b8,
     roughness: 0.92,
   });
   const ridgeMat = new THREE.MeshStandardMaterial({
     map: cloneRepeat(textures.roof, 12, 0.5),
+    normalMap: cloneRepeat(textures.normal.roof, 12, 0.5),
+    normalScale: new THREE.Vector2(1, 1),
     color: 0xa8573a,
     roughness: 0.85,
   });
   const trimMat = new THREE.MeshStandardMaterial({ color: 0xf6f3ec, roughness: 0.6 });
   const woodMat = new THREE.MeshStandardMaterial({
     map: cloneRepeat(textures.wood, 1.2, 1.2),
+    normalMap: cloneRepeat(textures.normal.wood, 1.2, 1.2),
+    normalScale: new THREE.Vector2(0.8, 0.8),
     color: 0x7c5330,
     roughness: 0.8,
   });
   const shutterMat = new THREE.MeshStandardMaterial({
     map: cloneRepeat(textures.wood, 1, 1.6),
+    normalMap: cloneRepeat(textures.normal.wood, 1, 1.6),
+    normalScale: new THREE.Vector2(0.7, 0.7),
     color: 0x78917c,
     roughness: 0.8,
   });
   const metalMat = new THREE.MeshStandardMaterial({
     map: cloneRepeat(textures.metal, 2, 1),
+    normalMap: cloneRepeat(textures.normal.metal, 2, 1),
+    normalScale: new THREE.Vector2(0.35, 0.35),
     color: 0x9aa4ad,
     roughness: 0.38,
     metalness: 0.85,
@@ -102,9 +120,11 @@ export function createHouse(textures) {
     opacity: 0.55,
   });
   const chimneyMat = new THREE.MeshStandardMaterial({
-    map: cloneRepeat(textures.stucco, 1.2, 1.8),
-    color: 0xe4d8c6,
-    roughness: 0.95,
+    map: cloneRepeat(textures.brick, 1.1, 2.1),
+    normalMap: cloneRepeat(textures.normal.brick, 1.1, 2.1),
+    normalScale: new THREE.Vector2(1.1, 1.1),
+    color: 0xd9c3ae,
+    roughness: 0.96,
   });
   const terracottaMat = new THREE.MeshStandardMaterial({
     color: 0xa8532f,
@@ -149,6 +169,7 @@ export function createHouse(textures) {
     const geo = new THREE.PlaneGeometry(width, length);
     const mat = (sign > 0 ? roofMat : roofMatNorth).clone();
     mat.map = cloneRepeat(textures.roof, 11, 3.2);
+    mat.normalMap = cloneRepeat(textures.normal.roof, 11, 3.2);
     if (sign < 0) mat.color = new THREE.Color(0xb08b77);
     const mesh = new THREE.Mesh(geo, mat);
     const dCenter = length / 2 + (sign > 0 ? 0 : 0.1);

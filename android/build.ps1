@@ -59,8 +59,14 @@ $env:ANDROID_SDK_ROOT = $Sdk
 
 if (-not $SkipWeb) {
     Push-Location $repo
+    # esbuild escribe su resumen en stderr: bajamos el ErrorActionPreference
+    # mientras corre para que PowerShell no lo trate como error terminante.
+    $previousEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     & npm run build
-    if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Fallo el build web" }
+    $buildCode = $LASTEXITCODE
+    $ErrorActionPreference = $previousEap
+    if ($buildCode -ne 0) { Pop-Location; throw "Fallo el build web" }
     Pop-Location
 }
 

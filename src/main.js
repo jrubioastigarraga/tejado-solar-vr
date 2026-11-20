@@ -6,6 +6,7 @@ import { createPlayer } from './player.js';
 import { createHUD } from './hud.js';
 import { createPPE } from './ppe.js';
 import { createSolar } from './solar.js';
+import { createElectrical } from './electrical.js';
 import { createInteractions } from './interactions.js';
 import { createGame } from './game.js';
 import { createAudio } from './audio.js';
@@ -86,6 +87,15 @@ const solar = createSolar({
   onTarget: (slot) => hud.setState({ target: slot }),
 });
 
+const electrical = createElectrical({
+  scene,
+  world,
+  textures,
+  solar,
+  notify: (text, kind) => hud.toast(text, kind),
+  onChange: () => game?.refreshAll(),
+});
+
 const interactions = createInteractions({
   renderer,
   scene,
@@ -94,6 +104,7 @@ const interactions = createInteractions({
 });
 
 game = createGame({
+  scene,
   player,
   solar,
   ppe,
@@ -101,6 +112,7 @@ game = createGame({
   world,
   interactions,
   audio,
+  electrical,
 });
 
 window.__game = game;
@@ -221,6 +233,7 @@ renderer.setAnimationLoop(() => {
   player.update(dt);
   game.update(dt);
   solar.update(dt);
+  electrical.update(dt);
   ppe.update(dt);
   interactions.update(dt);
   world.update(dt, t);
@@ -254,6 +267,13 @@ function applyDebugParams() {
     if (phase === 'roof') game.goTo(0.4, 2.35, 0);
     else game.goTo(0.15, 5.2, 0);
     game.debugPlace(panels);
+  }
+
+  if (params.has('electrical')) {
+    game.equipAll();
+    game.goTo(0.15, 5.2, 0);
+    if (!panels) game.debugPlace(9);
+    game.debugConnect();
   }
 
   const view = params.get('view');
@@ -293,10 +313,17 @@ function applyDebugParams() {
     game.goTo(0.2, 5.2, Math.PI / 2);
     player.camera.rotation.x = -0.03;
     game.debugPlace(9);
+  } else if (view === 'electrical') {
+    game.equipAll();
+    game.goTo(2.0, 4.6, Math.PI);
+    player.camera.rotation.x = -0.22;
+    game.debugPlace(9);
+    game.debugConnect();
   } else if (view === 'results') {
     game.equipAll();
     game.goTo(0.2, 5.2, 0);
     game.debugPlace(11);
+    game.debugConnect();
     setTimeout(() => game.finish(), 500);
   }
 }

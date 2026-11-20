@@ -47,7 +47,12 @@ export function createHUD({ camera, player, world, scene }) {
     kwp: 0,
     kwh: 0,
     shadeAvg: 1,
+    efficiency: 1,
+    dusty: 0,
     available: 16,
+    wired: false,
+    grounded: false,
+    powered: false,
     target: null,
     ppe: { helmet: false, goggles: false, gloves: false, harness: false },
   };
@@ -235,6 +240,24 @@ export function createHUD({ camera, player, world, scene }) {
       ctx.font = '600 22px Inter, Arial, sans-serif';
       ctx.fillText(`sombras ${Math.round(state.shadeAvg * 100)}%`, 210, 191);
 
+      // estado eléctrico
+      const badges = [
+        ['DC', state.wired],
+        ['TT', state.grounded],
+        ['ON', state.powered],
+      ];
+      let bx = 24;
+      for (const [tag, on] of badges) {
+        ctx.fillStyle = on ? 'rgba(70,217,155,0.22)' : 'rgba(255,255,255,0.06)';
+        ctx.beginPath();
+        ctx.roundRect(bx, 326, 58, 26, 8);
+        ctx.fill();
+        ctx.fillStyle = on ? '#8df7cf' : '#5a6d80';
+        ctx.font = '700 18px Inter, Arial, sans-serif';
+        ctx.fillText(tag, bx + 17, 346);
+        bx += 64;
+      }
+
       if (state.target) {
         ctx.fillStyle = 'rgba(70,217,155,0.12)';
         ctx.beginPath();
@@ -295,31 +318,45 @@ export function createHUD({ camera, player, world, scene }) {
           done: s.placed >= 8,
           info: `${s.placed}/${s.validSlots}`,
         },
-        { n: '4', text: 'Certificar la instalación', done: s.phase === 'done', info: '' },
+        {
+          n: '4',
+          text: 'Cable DC y puesta a tierra',
+          done: s.wired && s.grounded,
+          info: `${(s.wired ? 1 : 0) + (s.grounded ? 1 : 0)}/2`,
+        },
+        {
+          n: '5',
+          text: 'Puesta en marcha del sistema',
+          done: s.powered,
+          info: s.powered ? 'en marcha' : '',
+        },
+        { n: '6', text: 'Certificar la instalación', done: s.phase === 'done', info: '' },
       ];
 
-      let y = 150;
+      let y = 132;
       for (const step of steps) {
+        const rowH = 50;
         ctx.fillStyle = step.done ? 'rgba(70,217,155,0.14)' : 'rgba(255,255,255,0.03)';
         ctx.beginPath();
-        ctx.roundRect(40, y, w - 80, 62, 12);
+        ctx.roundRect(40, y, w - 80, rowH, 10);
         ctx.fill();
         ctx.strokeStyle = step.done ? 'rgba(70,217,155,0.5)' : 'rgba(130,155,180,0.18)';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.roundRect(40, y, w - 80, 62, 12);
+        ctx.roundRect(40, y, w - 80, rowH, 10);
         ctx.stroke();
         ctx.fillStyle = step.done ? '#46d99b' : '#65798d';
-        ctx.font = '800 26px Inter, Arial, sans-serif';
-        ctx.fillText(step.done ? '✓' : step.n, 60, y + 41);
+        ctx.font = '800 22px Inter, Arial, sans-serif';
+        ctx.fillText(step.done ? '✓' : step.n, 58, y + 33);
         ctx.fillStyle = step.done ? '#d9fff0' : '#c4d5e6';
-        ctx.font = '600 24px Inter, Arial, sans-serif';
-        ctx.fillText(step.text, 104, y + 40);
+        ctx.font = '600 21px Inter, Arial, sans-serif';
+        ctx.fillText(step.text, 96, y + 32);
         ctx.fillStyle = '#8ea4b9';
         ctx.textAlign = 'right';
-        ctx.fillText(step.info, w - 62, y + 40);
+        ctx.font = '500 18px Inter, Arial, sans-serif';
+        ctx.fillText(step.info, w - 58, y + 32);
         ctx.textAlign = 'left';
-        y += 72;
+        y += 56;
       }
 
       ctx.fillStyle = '#0a1522';
@@ -334,8 +371,9 @@ export function createHUD({ camera, player, world, scene }) {
       ctx.fillText(`${fmt(s.kwh)} kWh/año estimados`, 64, h - 78);
       ctx.fillStyle = '#93a9bd';
       ctx.font = '500 21px Inter, Arial, sans-serif';
+      const dustNote = s.dusty > 0 ? `${s.dusty} con polvo · ` : '';
       ctx.fillText(
-        `sombra media ${Math.round(s.shadeAvg * 100)}% · stock ${s.available} paneles`,
+        `sombra ${Math.round(s.shadeAvg * 100)}% · ${dustNote}stock ${s.available} paneles`,
         64,
         h - 46,
       );
@@ -357,12 +395,12 @@ export function createHUD({ camera, player, world, scene }) {
   let lastKey = '';
   let boardKey = '';
   function refresh(force = false) {
-    const key = `${state.placed}|${state.kwp}|${state.kwh}|${JSON.stringify(state.ppe)}|${state.phase}|${state.target?.index ?? ''}`;
+    const key = `${state.placed}|${state.kwp}|${state.kwh}|${JSON.stringify(state.ppe)}|${state.phase}|${state.target?.index ?? ''}|${state.wired}|${state.grounded}|${state.powered}|${state.dusty}`;
     if (!force && key === lastKey) return;
     lastKey = key;
     refreshDom();
     drawWrist();
-    const bkey = `${state.phase}|${state.placed}|${state.kwp}|${state.kwh}|${state.available}|${JSON.stringify(state.ppe)}`;
+    const bkey = `${state.phase}|${state.placed}|${state.kwp}|${state.kwh}|${state.available}|${JSON.stringify(state.ppe)}|${state.wired}|${state.grounded}|${state.powered}|${state.dusty}`;
     if (force || bkey !== boardKey) {
       boardKey = bkey;
       drawBoard();
@@ -441,8 +479,9 @@ export function createHUD({ camera, player, world, scene }) {
       lines: [
         { text: '1. Ponte el EPI de la mesa: casco, gafas, guantes y arnés.', color: '#e8f3ff' },
         { text: '2. Sube a cubierta con la línea de vida. El faldón sur tiene 15 huecos, 2 los ocupa la chimenea.', color: '#c9d8e8' },
-        { text: '3. Coge paneles del stock y acércalos a las guías. Evita el árbol: da sombra.', color: '#c9d8e8' },
-        { text: 'Con 8 paneles ya puedes certificar. Cuantos más y menos sombra, mejor nota.', color: '#ffc247' },
+        { text: '3. Monta al menos 8 paneles en las guías. Evita el árbol y limpia con el cepillo los que tengan polvo.', color: '#c9d8e8' },
+        { text: '4. Conecta el cable DC y la tierra en el cuadro, y acciona el interruptor de corte.', color: '#c9d8e8' },
+        { text: 'Después certifica la instalación en el cuadro de obra. Cuanta más producción, mejor nota.', color: '#ffc247' },
       ],
       button: 'EMPEZAR',
       action: null,

@@ -38,6 +38,15 @@ export function createSolar({ textures, house, world, camera, notify, onChange, 
   });
   const backMat = new THREE.MeshStandardMaterial({ color: 0xe9edf0, roughness: 0.55 });
   const cableMat = new THREE.MeshStandardMaterial({ color: 0x1a1c1f, roughness: 0.8 });
+  const dustMat = new THREE.MeshStandardMaterial({
+    map: textures.dust,
+    transparent: true,
+    opacity: 0.72,
+    depthWrite: false,
+    roughness: 1,
+    metalness: 0,
+    color: 0xffffff,
+  });
 
   /* ------------------------------------------------------------------ huecos */
   const slots = [];
@@ -110,6 +119,14 @@ export function createSolar({ textures, house, world, camera, notify, onChange, 
     glass.castShadow = true;
     g.add(glass);
 
+    const dust = new THREE.Mesh(
+      new THREE.PlaneGeometry(PANEL.width - 0.07, PANEL.height - 0.07),
+      dustMat,
+    );
+    dust.position.z = 0.031;
+    dust.visible = false;
+    g.add(dust);
+
     const jbox = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.09, 0.035), cableMat);
     jbox.position.set(0.42, 0.2, -0.035);
     g.add(jbox);
@@ -124,6 +141,9 @@ export function createSolar({ textures, house, world, camera, notify, onChange, 
       slot: null,
       canGrab: true,
       holder: null,
+      dust: 0,
+      dustAssigned: false,
+      dustMesh: dust,
     };
     return g;
   }
@@ -153,29 +173,64 @@ export function createSolar({ textures, house, world, camera, notify, onChange, 
     kwp: 0,
     annualKwh: 0,
     shadeAvg: 1,
+    efficiency: 1,
+    dusty: 0,
+    dustWarned: false,
     available: 16,
     validSlots: validSlots.length,
     target: null,
     targetShade: null,
   };
 
+  /** Algunos huecos llegan con polvo: reducen la producción hasta limpiarlos. */
+  function setDust(panel, slot) {
+    if (panel.userData.dustAssigned) return;
+    panel.userData.dustAssigned = true;
+    const dusty = slot.index % 5 === 2;
+    panel.userData.dust = dusty ? 0.16 : 0;
+    panel.userData.dustMesh.visible = dusty;
+    if (dusty && !state.dustWarned) {
+      state.dustWarned = true;
+      notify?.('Ese panel tiene polvo: coge el cepillo y frótalo para recuperar rendimiento.', '');
+    }
+  }
+
   function recompute() {
     let kwh = 0;
     let shadeSum = 0;
     let placed = 0;
+    let dusty = 0;
     for (const s of slots) {
       if (!s.panel) continue;
       placed++;
-      kwh += (PANEL.watts / 1000) * ENERGY.yieldPerKwp * s.shade;
+      const dust = 1 - (s.panel.userData.dust || 0);
+      kwh += (PANEL.watts / 1000) * ENERGY.yieldPerKwp * s.shade * dust;
       shadeSum += s.shade;
+      if (s.panel.userData.dust > 0) dusty++;
     }
     state.placed = placed;
     state.kwp = (placed * PANEL.watts) / 1000;
     state.annualKwh = Math.round(kwh);
     state.shadeAvg = placed ? shadeSum / placed : 1;
+    state.efficiency = state.kwp > 0 ? kwh / (state.kwp * ENERGY.yieldPerKwp) : 1;
+    state.dusty = dusty;
     state.available = rackPanels().length;
     onChange?.(state);
     return state;
+  }
+
+  function cleanPanel(panel) {
+    if (!panel || panel.userData.dust <= 0) return false;
+    panel.userData.dust = 0;
+    panel.userData.dustMesh.visible = false;
+    recompute();
+    notify?.('Panel limpio: recupera el 100 % de rendimiento.', 'ok');
+    if (window.__sfx) window.__sfx.snap();
+    return true;
+  }
+
+  function dustyPanels() {
+    return panels.filter((p) => p.userData.state === 'installed' && p.userData.dust > 0);
   }
 
   /* ------------------------------------------------------------ posicionado */
@@ -253,6 +308,7 @@ export function createSolar({ textures, house, world, camera, notify, onChange, 
   function place(panel, slot) {
     panel.userData.state = 'placing';
     panel.userData.canGrab = false;
+    setDust(panel, slot);
     slot.panel = panel;
     animateTo(panel, slot.position, slot.quaternion, 0.22, () => {
       panel.userData.state = 'installed';
@@ -365,8 +421,12 @@ export function createSolar({ textures, house, world, camera, notify, onChange, 
       p.userData.slot = null;
       p.userData.holder = null;
       p.userData.canGrab = true;
+      p.userData.dust = 0;
+      p.userData.dustAssigned = false;
+      p.userData.dustMesh.visible = false;
       p.scale.setScalar(1);
     }
+    state.dustWarned = false;
     refreshRack();
     recompute();
   }
@@ -383,6 +443,7 @@ export function createSolar({ textures, house, world, camera, notify, onChange, 
       p.userData.canGrab = true;
       p.position.copy(slot.position);
       p.quaternion.copy(slot.quaternion);
+      setDust(p, slot);
       slot.panel = p;
     });
     refreshRack();
@@ -405,6 +466,8 @@ export function createSolar({ textures, house, world, camera, notify, onChange, 
     findTarget,
     refreshRack,
     debugPlace,
+    cleanPanel,
+    dustyPanels,
   };
 
   recompute();

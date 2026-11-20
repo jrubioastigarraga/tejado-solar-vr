@@ -205,6 +205,8 @@ export function createWorld({ scene, renderer, textures, house }) {
   const grassTex = cloneRepeat(textures.grass, 70, 70);
   const groundMat = new THREE.MeshStandardMaterial({
     map: grassTex,
+    normalMap: cloneRepeat(textures.normal.grass, 70, 70),
+    normalScale: new THREE.Vector2(0.65, 0.65),
     color: 0x9aa87a,
     roughness: 1,
   });
@@ -215,6 +217,8 @@ export function createWorld({ scene, renderer, textures, house }) {
 
   const gravelMat = new THREE.MeshStandardMaterial({
     map: cloneRepeat(textures.gravel, 5, 12),
+    normalMap: cloneRepeat(textures.normal.gravel, 5, 12),
+    normalScale: new THREE.Vector2(0.9, 0.9),
     color: 0xc9c3b6,
     roughness: 1,
   });
@@ -232,6 +236,8 @@ export function createWorld({ scene, renderer, textures, house }) {
 
   const asphaltMat = new THREE.MeshStandardMaterial({
     map: cloneRepeat(textures.asphalt, 30, 2),
+    normalMap: cloneRepeat(textures.normal.asphalt, 30, 2),
+    normalScale: new THREE.Vector2(0.7, 0.7),
     color: 0x777b7e,
     roughness: 0.95,
   });
@@ -258,6 +264,52 @@ export function createWorld({ scene, renderer, textures, house }) {
     hedge.receiveShadow = true;
     group.add(hedge);
   }
+
+  /* ------------------------------------------------------------ material de obra */
+  const brickMat = new THREE.MeshStandardMaterial({
+    map: cloneRepeat(textures.brick, 1, 1),
+    normalMap: cloneRepeat(textures.normal.brick, 1, 1),
+    normalScale: new THREE.Vector2(0.9, 0.9),
+    color: 0xd8c6b2,
+    roughness: 0.96,
+  });
+  const coneMat = new THREE.MeshStandardMaterial({ color: 0xf2661f, roughness: 0.62 });
+  const coneBandMat = new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.5 });
+
+  function makeCone(x, z, rotY = 0) {
+    const cone = new THREE.Group();
+    cone.add(box(0.32, 0.035, 0.32, coneMat, 0, 0.018, 0));
+    const body = new THREE.Mesh(new THREE.ConeGeometry(0.155, 0.52, 18), coneMat);
+    body.position.y = 0.29;
+    body.castShadow = true;
+    body.receiveShadow = true;
+    cone.add(body);
+    const band = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.108, 0.126, 0.085, 18, 1, true),
+      coneBandMat,
+    );
+    band.position.y = 0.31;
+    cone.add(band);
+    cone.position.set(x, 0, z);
+    cone.rotation.y = rotY;
+    return cone;
+  }
+  group.add(makeCone(4.9, 8.1, 0.2), makeCone(5.6, 10.4, -0.3), makeCone(-5.9, 8.4, 0.5));
+
+  // palé de ladrillos junto a la fachada
+  const palletMat = new THREE.MeshStandardMaterial({ color: 0x9b7a4e, roughness: 0.9 });
+  const brickStack = new THREE.Group();
+  brickStack.add(box(0.92, 0.09, 0.62, palletMat, 0, 0.045, 0));
+  for (let layer = 0; layer < 4; layer++) {
+    for (let i = 0; i < 5; i++) {
+      const brick = box(0.19, 0.072, 0.1, brickMat, -0.34 + i * 0.17, 0.13 + layer * 0.078, 0.06);
+      brick.rotation.y = (layer % 2) * (Math.PI / 2);
+      brickStack.add(brick);
+    }
+  }
+  brickStack.position.set(7.4, 0, 5.6);
+  brickStack.rotation.y = 0.28;
+  group.add(brickStack);
 
   /* ----------------------------------------------------------------- árboles */
   const trees = [];
@@ -292,6 +344,8 @@ export function createWorld({ scene, renderer, textures, house }) {
   /* ------------------------------------------------------------------ valla */
   const fenceMat = new THREE.MeshStandardMaterial({
     map: cloneRepeat(textures.wood, 2, 1),
+    normalMap: cloneRepeat(textures.normal.wood, 2, 1),
+    normalScale: new THREE.Vector2(0.7, 0.7),
     color: 0x8e6c46,
     roughness: 0.9,
   });
@@ -384,12 +438,16 @@ export function createWorld({ scene, renderer, textures, house }) {
   const scaffold = new THREE.Group();
   const metal = new THREE.MeshStandardMaterial({
     map: cloneRepeat(textures.metal, 2, 1),
+    normalMap: cloneRepeat(textures.normal.metal, 2, 1),
+    normalScale: new THREE.Vector2(0.35, 0.35),
     color: 0xaeb7bd,
     roughness: 0.42,
     metalness: 0.8,
   });
   const deckMat = new THREE.MeshStandardMaterial({
     map: cloneRepeat(textures.wood, 5, 1),
+    normalMap: cloneRepeat(textures.normal.wood, 5, 1),
+    normalScale: new THREE.Vector2(0.9, 0.9),
     color: 0xa9a083,
     roughness: 0.85,
   });
@@ -534,6 +592,8 @@ export function createWorld({ scene, renderer, textures, house }) {
   const benchGroup = new THREE.Group();
   const benchTopMat = new THREE.MeshStandardMaterial({
     map: cloneRepeat(textures.wood, 3, 1),
+    normalMap: cloneRepeat(textures.normal.wood, 3, 1),
+    normalScale: new THREE.Vector2(0.8, 0.8),
     color: 0xd6b184,
     roughness: 0.78,
   });
@@ -683,6 +743,27 @@ export function createWorld({ scene, renderer, textures, house }) {
   mergeStatic(rackGroup);
   group.add(rackGroup);
 
+  /* ---------------------------------------------------- cepillo de limpieza */
+  const brushGroup = new THREE.Group();
+  const brushWoodMat = new THREE.MeshStandardMaterial({ color: 0x9a6b3f, roughness: 0.85 });
+  const bristleMat = new THREE.MeshStandardMaterial({ color: 0xd8c48f, roughness: 1 });
+  const brushHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.024, 0.42, 10), brushWoodMat);
+  brushHandle.rotation.z = Math.PI / 2;
+  brushHandle.position.x = -0.16;
+  brushHandle.castShadow = true;
+  brushGroup.add(brushHandle);
+  brushGroup.add(box(0.26, 0.05, 0.11, brushWoodMat, 0.16, 0, 0));
+  for (let i = 0; i < 5; i++) {
+    brushGroup.add(box(0.2, 0.05, 0.014, bristleMat, 0.16, -0.045, -0.042 + i * 0.021));
+  }
+  brushGroup.position.set(2.25, deckY + 0.075, 5.72);
+  brushGroup.rotation.y = -0.45;
+  brushGroup.userData.basePos = brushGroup.position.clone();
+  brushGroup.userData.baseQuat = brushGroup.quaternion.clone();
+  brushGroup.userData.state = 'free';
+  brushGroup.userData.kind = 'brush';
+  group.add(brushGroup);
+
   /* --------------------------------------------------------------- helpers */
   const shadeSpheres = shadeTree.shadeSpheres;
   const raycaster = new THREE.Raycaster();
@@ -728,7 +809,7 @@ export function createWorld({ scene, renderer, textures, house }) {
     }
   }
 
-  function setLcd(lines, accent = '#46d99b') {
+  function setLcd(lines, accent = '#46d99b', footer = null) {
     lcd.draw((ctx, w, h) => {
       ctx.fillStyle = '#061019';
       ctx.fillRect(0, 0, w, h);
@@ -744,9 +825,9 @@ export function createWorld({ scene, renderer, textures, house }) {
       ctx.fillStyle = '#bfe0d1';
       ctx.font = '500 24px Inter, Arial, sans-serif';
       ctx.fillText(lines[1] || 'sin producción', 28, 168);
-      ctx.fillStyle = '#4f7a68';
-      ctx.font = '500 18px Inter, Arial, sans-serif';
-      ctx.fillText('strings · 1', 28, 216);
+      ctx.fillStyle = footer ? '#8fe8c0' : '#4f7a68';
+      ctx.font = '600 18px Inter, Arial, sans-serif';
+      ctx.fillText(footer || 'strings · 1', 28, 216);
       ctx.fillStyle = '#46d99b';
       ctx.beginPath();
       ctx.arc(w - 42, 40, 7, 0, Math.PI * 2);
@@ -767,6 +848,9 @@ export function createWorld({ scene, renderer, textures, house }) {
     accessPedestal,
     finishButton,
     finishConsole: consoleGroup,
+    deckY,
+    consolePos: new THREE.Vector3(3.18, deckY, SITE.platform.z1 - 0.2),
+    brush: brushGroup,
     bench: { group: benchGroup, topY: 0.985, rotY: SITE.bench.rotY, x: SITE.bench.x, z: SITE.bench.z },
     board: { group: boardGroup, screen: boardScreen, position: boardPos },
     rack: { group: rackGroup, baseY: roofYAt(3.9) },
