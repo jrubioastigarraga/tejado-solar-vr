@@ -18,10 +18,13 @@ el entorno:
 
 - **Villa mediterránea** (`?theme=villa`, por defecto): vivienda con cubierta de teja árabe,
   jardín, camino de grava y calle.
-- **Isla de la pagoda** (`?theme=pagoda`): isla flotante con pagoda japonesa de tejado
-  *kawara*, cerezos en flor, torii, faroles de piedra, bambú y cascada al vacío.
+- **Isla de la pagoda** (`?theme=pagoda`): isla flotante con una pagoda de tres cuerpos y
+  tejado *kawara*, paneles solares en su cubierta, cerezos en flor, torii, faroles de piedra,
+  bambú, cascada al vacío y un **lago con peces koi**.
 
-La elección se guarda en la URL, así que puedes compartir o marcar cada escena.
+La elección se guarda en la URL, así que puedes compartir o marcar cada escena. En la isla,
+las tareas siguen siendo las mismas: el EPI se coge en la mesa, el andamio da acceso a la
+cubierta de la pagoda y el cuadro eléctrico está junto a los paneles.
 
 ![Isla de la pagoda](docs/pagoda.jpg)
 

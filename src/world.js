@@ -294,6 +294,7 @@ function makeBamboo(seed = 1, count = 7) {
 
 export function createWorld({ scene, renderer, textures, house, theme = 'villa' }) {
   const pagoda = theme === 'pagoda';
+  const fish = [];
   const group = new THREE.Group();
   group.name = 'entorno';
   scene.add(group);
@@ -507,6 +508,147 @@ export function createWorld({ scene, renderer, textures, house, theme = 'villa' 
       boulder.castShadow = true;
       boulder.receiveShadow = true;
       deco.add(boulder);
+    }
+
+    /* ----------------------------------------------------------- lago */
+    const lakeX = 13.2;
+    const lakeZ = 3.6;
+    const lakeR = 4.2;
+
+    const shore = new THREE.Mesh(
+      new THREE.CircleGeometry(lakeR + 0.55, 48),
+      new THREE.MeshStandardMaterial({
+        map: cloneRepeat(textures.gravel, 4, 4),
+        normalMap: cloneRepeat(textures.normal.gravel, 4, 4),
+        color: 0xa89f88,
+        roughness: 1,
+      }),
+    );
+    shore.rotation.x = -Math.PI / 2;
+    shore.position.set(lakeX, 0.006, lakeZ);
+    shore.receiveShadow = true;
+    deco.add(shore);
+
+    const bed = new THREE.Mesh(
+      new THREE.CircleGeometry(lakeR, 48),
+      new THREE.MeshStandardMaterial({ color: 0x22332f, roughness: 1 }),
+    );
+    bed.rotation.x = -Math.PI / 2;
+    bed.position.set(lakeX, 0.004, lakeZ);
+    deco.add(bed);
+
+    const lakeWater = new THREE.Mesh(
+      new THREE.CircleGeometry(lakeR, 48),
+      new THREE.MeshStandardMaterial({
+        color: 0x3d8fa0,
+        transparent: true,
+        opacity: 0.52,
+        roughness: 0.08,
+        metalness: 0.35,
+        emissive: 0x0b2a30,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    lakeWater.rotation.x = -Math.PI / 2;
+    lakeWater.position.set(lakeX, 0.05, lakeZ);
+    lakeWater.renderOrder = 2;
+    group.add(lakeWater);
+
+    // orilla de piedras
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * Math.PI * 2;
+      const rock = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.28 + Math.random() * 0.4, 0),
+        rockMat,
+      );
+      rock.position.set(
+        lakeX + Math.cos(a) * (lakeR + 0.35),
+        0.12,
+        lakeZ + Math.sin(a) * (lakeR + 0.35),
+      );
+      rock.scale.set(1, 0.7, 1);
+      rock.rotation.set(Math.random(), Math.random(), Math.random());
+      rock.castShadow = true;
+      rock.receiveShadow = true;
+      deco.add(rock);
+    }
+
+    // nenúfares y juncos
+    const padMat = new THREE.MeshStandardMaterial({
+      color: 0x477d3d,
+      roughness: 0.85,
+      side: THREE.DoubleSide,
+    });
+    for (let i = 0; i < 10; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.random() * (lakeR - 0.9);
+      const pad = new THREE.Mesh(new THREE.CircleGeometry(0.2 + Math.random() * 0.16, 12), padMat);
+      pad.rotation.x = -Math.PI / 2;
+      pad.position.set(lakeX + Math.cos(a) * r, 0.062, lakeZ + Math.sin(a) * r);
+      deco.add(pad);
+    }
+    const reedMat = new THREE.MeshStandardMaterial({ color: 0x6f8f45, roughness: 0.9 });
+    for (let i = 0; i < 16; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = lakeR + 0.2 + Math.random() * 0.5;
+      const h = 0.5 + Math.random() * 0.7;
+      const reed = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.018, h, 5), reedMat);
+      reed.position.set(lakeX + Math.cos(a) * r, h / 2, lakeZ + Math.sin(a) * r);
+      reed.rotation.z = (Math.random() - 0.5) * 0.2;
+      deco.add(reed);
+    }
+
+    // embarcadero
+    const pierMat = new THREE.MeshStandardMaterial({
+      map: cloneRepeat(textures.wood, 2, 1),
+      normalMap: cloneRepeat(textures.normal.wood, 2, 1),
+      normalScale: new THREE.Vector2(0.7, 0.7),
+      color: 0x8e6c46,
+      roughness: 0.9,
+    });
+    const pierPostMat = new THREE.MeshStandardMaterial({ color: 0x4a3524, roughness: 0.95 });
+    const pier = new THREE.Group();
+    pier.add(box(1.1, 0.09, 2.2, pierMat, 0, 0.14, 0));
+    for (const px of [-0.45, 0.45]) {
+      for (const pz of [-0.9, 0.9]) {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.1, 7), pierPostMat);
+        post.position.set(px, -0.4, pz);
+        pier.add(post);
+      }
+    }
+    pier.position.set(lakeX - 3.0, 0.02, lakeZ + 1.2);
+    pier.rotation.y = 0.5;
+    deco.add(pier);
+
+    // peces koi
+    const koiColors = [0xff8a3d, 0xfff0dc, 0xe04a2f, 0xffc247, 0xf5f2ea];
+    for (let i = 0; i < 11; i++) {
+      const koi = new THREE.Group();
+      const mat = new THREE.MeshStandardMaterial({
+        color: koiColors[i % koiColors.length],
+        roughness: 0.5,
+        emissive: 0x241008,
+        emissiveIntensity: 0.25,
+      });
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), mat);
+      body.scale.set(1.9, 0.75, 1);
+      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.16, 4), mat);
+      tail.rotation.z = Math.PI / 2;
+      tail.position.x = -0.18;
+      koi.add(body, tail);
+      koi.scale.setScalar(0.75 + Math.random() * 0.5);
+      group.add(koi);
+      fish.push({
+        mesh: koi,
+        cx: lakeX,
+        cz: lakeZ,
+        r: 0.7 + Math.random() * (lakeR - 1.4),
+        speed: 0.18 + Math.random() * 0.3,
+        phase: Math.random() * Math.PI * 2,
+        dir: Math.random() > 0.5 ? 1 : -1,
+        y: 0.008 + Math.random() * 0.025,
+      });
     }
 
     group.add(deco);
@@ -1149,6 +1291,17 @@ export function createWorld({ scene, renderer, textures, house, theme = 'villa' 
       t.group.rotation.z = Math.sin(elapsed * 0.7 + sway) * 0.006;
       t.group.rotation.x = Math.cos(elapsed * 0.5 + sway) * 0.004;
     }
+
+    // koi nadando en círculos bajo la superficie
+    for (const f of fish) {
+      const a = f.phase + elapsed * f.speed * f.dir;
+      f.mesh.position.set(
+        f.cx + Math.cos(a) * f.r,
+        f.y + Math.sin(elapsed * 2.2 + f.phase) * 0.02,
+        f.cz + Math.sin(a) * f.r,
+      );
+      f.mesh.rotation.y = Math.atan2(-Math.cos(a) * f.dir, -Math.sin(a) * f.dir);
+    }
   }
 
   function setLcd(lines, accent = '#46d99b', footer = null) {
@@ -1183,6 +1336,7 @@ export function createWorld({ scene, renderer, textures, house, theme = 'villa' 
     sky,
     sun,
     trees,
+    fish,
     shadeSpheres,
     shadeAt,
     update,

@@ -47,7 +47,7 @@ if (isPagoda) {
   const tagline = document.querySelector('#intro .tagline');
   if (tagline) {
     tagline.textContent =
-      'Sube a la pagoda de una isla flotante y monta la instalación fotovoltaica. EPI, guías, sombras y producción anual en un entorno japonés.';
+      'Sube a la pagoda de una isla flotante y monta la instalación fotovoltaica sobre su tejado. EPI, guías, sombras y producción anual entre cerezos y un lago de koi.';
   }
 }
 
