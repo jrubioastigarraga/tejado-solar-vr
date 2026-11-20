@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { buildTextures } from './textures.js';
 import { createHouse } from './house.js';
+import { createPagoda } from './pagoda.js';
+import { theme, isPagoda } from './theme.js';
 import { createWorld } from './world.js';
 import { createPlayer } from './player.js';
 import { createHUD } from './hud.js';
@@ -21,6 +23,33 @@ const btnFlat = document.getElementById('btn-flat');
 const vrNote = document.getElementById('vr-note');
 const btnRestart = document.getElementById('btn-restart');
 const btnCloseResults = document.getElementById('btn-close-results');
+
+/* ---------------------------------------------------------- selector de escena */
+document.querySelectorAll('#theme-picker [data-theme]').forEach((btn) => {
+  const active = btn.dataset.theme === theme;
+  btn.classList.toggle('active', active);
+  btn.setAttribute('aria-pressed', String(active));
+  btn.addEventListener('click', () => {
+    if (btn.dataset.theme === theme) return;
+    const url = new URL(location.href);
+    url.searchParams.set('theme', btn.dataset.theme);
+    for (const key of ['skipintro', 'view', 'panels', 'electrical', 'nohud']) {
+      url.searchParams.delete(key);
+    }
+    location.assign(url.toString());
+  });
+});
+
+if (isPagoda) {
+  document.title = 'Pagoda Solar VR · Isla flotante';
+  const introTitle = document.querySelector('#intro h1');
+  if (introTitle) introTitle.innerHTML = 'PAGODA<br /><em>SOLAR</em> VR';
+  const tagline = document.querySelector('#intro .tagline');
+  if (tagline) {
+    tagline.textContent =
+      'Sube a la pagoda de una isla flotante y monta la instalación fotovoltaica. EPI, guías, sombras y producción anual en un entorno japonés.';
+  }
+}
 
 /* ------------------------------------------------------------------ renderer */
 const glTest = document.createElement('canvas').getContext('webgl2');
@@ -55,13 +84,14 @@ scene.background = new THREE.Color(0x9fbfd8);
 /* --------------------------------------------------------------- construcción */
 const textures = buildTextures(renderer);
 
-const house = createHouse(textures);
+const house = isPagoda ? createPagoda(textures) : createHouse(textures);
 mergeStatic(house.group, new Set([house.chimney]));
 scene.add(house.group);
 house.group.updateMatrixWorld(true);
 
-const world = createWorld({ scene, renderer, textures, house });
+const world = createWorld({ scene, renderer, textures, house, theme });
 const player = createPlayer({ renderer, scene });
+player.state.bounds = isPagoda ? 22 : 0;
 const hud = createHUD({ camera: player.camera, player, world, scene });
 const audio = createAudio();
 
@@ -220,14 +250,14 @@ renderer.setAnimationLoop(() => {
   const t = clock.elapsed;
 
   if (!started) {
-    // cámara de presentación orbitando la casa
+    // cámara de presentación orbitando la escena
     const ang = t * 0.06 + 0.6;
-    const r = 15.5;
+    const r = isPagoda ? 31 : 15.5;
     const x = Math.sin(ang) * r;
     const z = Math.cos(ang) * r + 1;
-    player.rig.position.set(x, 3.1, z);
+    player.rig.position.set(x, isPagoda ? 9.5 : 3.1, z);
     player.rig.rotation.y = Math.atan2(x, z);
-    player.camera.rotation.x = -0.09;
+    player.camera.rotation.x = isPagoda ? -0.22 : -0.09;
   }
 
   player.update(dt);
@@ -312,6 +342,12 @@ function applyDebugParams() {
     game.equipAll();
     game.goTo(0.2, 5.2, Math.PI / 2);
     player.camera.rotation.x = -0.03;
+    game.debugPlace(9);
+  } else if (view === 'island') {
+    game.equipAll();
+    player.state.eye = 10;
+    game.goTo(30, 24, Math.atan2(30, 24));
+    player.camera.rotation.x = -0.26;
     game.debugPlace(9);
   } else if (view === 'electrical') {
     game.equipAll();

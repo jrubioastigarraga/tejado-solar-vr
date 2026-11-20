@@ -11,6 +11,20 @@ Ponte el EPI, sube al andamio, camina por el faldón sur, monta los paneles sobr
 guías, evita la sombra del árbol y certifica la instalación. Al final obtienes la
 producción anual estimada, el ahorro y la nota de la obra.
 
+## Dos escenas
+
+En la portada eliges el escenario antes de empezar; la jugabilidad es idéntica, solo cambia
+el entorno:
+
+- **Villa mediterránea** (`?theme=villa`, por defecto): vivienda con cubierta de teja árabe,
+  jardín, camino de grava y calle.
+- **Isla de la pagoda** (`?theme=pagoda`): isla flotante con pagoda japonesa de tejado
+  *kawara*, cerezos en flor, torii, faroles de piedra, bambú y cascada al vacío.
+
+La elección se guarda en la URL, así que puedes compartir o marcar cada escena.
+
+![Isla de la pagoda](docs/pagoda.jpg)
+
 ## Jugar en Pico 4
 
 ### Opción A · APK (recomendada, sin navegador)
@@ -152,8 +166,10 @@ Guarda el keystore y su contraseña fuera del repositorio (gestor de contraseña
 segura): sin ellos no podrás firmar actualizaciones que se instalen encima.
 
 ```
-index.html            interfaz de inicio, HUD y resultados
+index.html            interfaz de inicio, selector de escena, HUD y resultados
+src/theme.js          escena activa (villa o pagoda) desde la URL
 src/main.js           renderer, arranque, sesión XR y bucle
+src/pagoda.js         pagoda japonesa: tejado kawara, shoji y segundo cuerpo
 src/player.js         rig VR, mandos, locomoción, giro y modo ratón/teclado
 src/house.js          casa, cubierta, guías, ventanas y chimenea
 src/world.js          cielo, sol, terreno, árboles, andamio, EPI y cuadro de obra
@@ -174,8 +190,9 @@ foveación fija (0,65) al entrar en VR.
 
 ### Depuración
 
-`?skipintro=1` entra directamente. `?view=drone`, `?view=roof`, `?view=platform`,
-`?view=bench`, `?view=electrical` o `?view=results` colocan la cámara de revisión.
+`?skipintro=1` entra directamente y `?theme=pagoda` carga la isla. `?view=drone`,
+`?view=roof`, `?view=platform`, `?view=bench`, `?view=electrical`, `?view=island` o
+`?view=results` colocan la cámara de revisión.
 `?panels=9` monta paneles de prueba, `?electrical` conecta y arranca el sistema, y
 `?nohud=1` oculta el HUD.
 

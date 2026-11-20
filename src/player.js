@@ -69,6 +69,7 @@ export function createPlayer({ renderer, scene }) {
     pitch: 0,
     snapCooldown: 0,
     locked: false,
+    bounds: 0,
   };
 
   const player = {
@@ -190,6 +191,7 @@ export function createPlayer({ renderer, scene }) {
         const tryMove = (dx, dz) => {
           const nx = rig.position.x + dx;
           const nz = rig.position.z + dz;
+          if (state.bounds && nx * nx + nz * nz > state.bounds * state.bounds) return false;
           const h = this.groundHeightAt(nx, nz);
           if (Math.abs(h - state.groundY) > 0.62) return false;
           // no atravesar la chimenea en la cubierta

@@ -174,6 +174,81 @@ function drawRoofTiles() {
   return c;
 }
 
+/* --------------------------------------------------------------- kawara */
+function drawKawara() {
+  const S = 512;
+  const c = canvas(S, S);
+  const g = c.getContext('2d');
+  const rand = rng(13);
+
+  g.fillStyle = '#232c34';
+  g.fillRect(0, 0, S, S);
+
+  const cols = 6;
+  const rows = 7;
+  const w = S / cols;
+  const h = S / rows;
+
+  const tones = Array.from({ length: rows }, () =>
+    Array.from({ length: cols }, () => 0.8 + rand() * 0.34),
+  );
+
+  for (let row = -1; row <= rows; row++) {
+    const offset = (((row % 2) + 2) % 2) * (w / 2);
+    const toneRow = tones[((row % rows) + rows) % rows];
+    for (let col = -1; col <= cols; col++) {
+      const ci = ((col % cols) + cols) % cols;
+      const x = col * w + offset;
+      const y = row * h;
+      const tone = toneRow[ci];
+      const r = 74 * tone;
+      const gg = 90 * tone;
+      const b = 104 * tone;
+
+      // media caña de cerámica, brillo central y sombra en los bordes
+      const grd = g.createLinearGradient(x, 0, x + w, 0);
+      grd.addColorStop(0, `rgb(${r * 0.38 | 0},${gg * 0.4 | 0},${b * 0.44 | 0})`);
+      grd.addColorStop(0.16, `rgb(${r * 0.72 | 0},${gg * 0.74 | 0},${b * 0.8 | 0})`);
+      grd.addColorStop(0.42, `rgb(${Math.min(255, r * 1.22) | 0},${Math.min(255, gg * 1.2) | 0},${Math.min(255, b * 1.16) | 0})`);
+      grd.addColorStop(0.6, `rgb(${r * 1.02 | 0},${gg * 1.02 | 0},${b * 1.02 | 0})`);
+      grd.addColorStop(1, `rgb(${r * 0.34 | 0},${gg * 0.36 | 0},${b * 0.4 | 0})`);
+
+      g.fillStyle = grd;
+      g.beginPath();
+      g.moveTo(x + 1.5, y - 1);
+      g.lineTo(x + w - 1.5, y - 1);
+      g.lineTo(x + w - 1.5, y + h - 6);
+      g.quadraticCurveTo(x + w / 2, y + h + 8, x + 1.5, y + h - 6);
+      g.closePath();
+      g.fill();
+
+      g.fillStyle = 'rgba(8,12,16,0.4)';
+      g.fillRect(x, y - 1, w, 4);
+      g.fillStyle = 'rgba(210,230,245,0.09)';
+      g.fillRect(x + w * 0.34, y + 3, w * 0.1, h * 0.5);
+
+      // musgo y cal en las juntas
+      if (rand() > 0.84) {
+        g.fillStyle = `rgba(${74 + rand() * 30 | 0},${92 + rand() * 26 | 0},${58 + rand() * 20 | 0},${0.1 + rand() * 0.18})`;
+        g.beginPath();
+        g.arc(x + w * rand(), y + h * rand(), 1 + rand() * 4, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+  }
+
+  // brillo húmedo y regueros
+  for (let i = 0; i < 34; i++) {
+    const x = rand() * S;
+    const grd = g.createLinearGradient(x, 0, x, S);
+    grd.addColorStop(0, `rgba(200,225,240,${0.03 + rand() * 0.05})`);
+    grd.addColorStop(1, 'rgba(200,225,240,0)');
+    g.fillStyle = grd;
+    g.fillRect(x, 0, 1 + rand() * 2, S);
+  }
+  return c;
+}
+
 /* --------------------------------------------------------------- estuco */
 function drawStucco() {
   const S = 512;
@@ -722,6 +797,7 @@ export function buildTextures(renderer) {
   ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
   const roofC = drawRoofTiles();
+  const kawaraC = drawKawara();
   const stuccoC = drawStucco();
   const stoneC = drawStone();
   const grassC = drawGrass();
@@ -736,6 +812,7 @@ export function buildTextures(renderer) {
 
   return {
     roof: texture(roofC),
+    kawara: texture(kawaraC),
     stucco: texture(stuccoC),
     stone: texture(stoneC),
     grass: texture(grassC),
@@ -749,6 +826,7 @@ export function buildTextures(renderer) {
     dust: texture(dustC),
     normal: {
       roof: normalTexture(normalFrom(roofC, 2.6)),
+      kawara: normalTexture(normalFrom(kawaraC, 2.2)),
       stucco: normalTexture(normalFrom(stuccoC, 0.5)),
       stone: normalTexture(normalFrom(stoneC, 2.2)),
       grass: normalTexture(normalFrom(grassC, 0.8)),

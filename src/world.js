@@ -29,7 +29,7 @@ function tube(r, len, mat) {
   return m;
 }
 
-function makeSky() {
+function makeSky(pagoda = false) {
   const geo = new THREE.SphereGeometry(420, 40, 24);
   const mat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
@@ -37,9 +37,9 @@ function makeSky() {
     fog: false,
     toneMapped: false,
     uniforms: {
-      topColor: { value: new THREE.Color('#3f7db4') },
-      midColor: { value: new THREE.Color('#a9c8dd') },
-      horizonColor: { value: new THREE.Color('#e6eef2') },
+      topColor: { value: new THREE.Color(pagoda ? '#37679a' : '#3f7db4') },
+      midColor: { value: new THREE.Color(pagoda ? '#b6d3e6' : '#a9c8dd') },
+      horizonColor: { value: new THREE.Color(pagoda ? '#f4e7e0' : '#e6eef2') },
       sunColor: { value: new THREE.Color('#fff3d8') },
       sunDir: { value: SUN_DIR.clone() },
     },
@@ -74,7 +74,7 @@ function makeSky() {
   return { mesh, mat };
 }
 
-function makeTree({ x, z, scale = 1, seed = 1, big = false }) {
+function makeTree({ x, z, scale = 1, seed = 1, big = false, palette = null }) {
   const group = new THREE.Group();
   const rand = (() => {
     let a = seed * 9871;
@@ -85,7 +85,10 @@ function makeTree({ x, z, scale = 1, seed = 1, big = false }) {
   })();
 
   const trunkH = (big ? 4.9 : 3.1) * scale;
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a4632, roughness: 0.95 });
+  const trunkMat = new THREE.MeshStandardMaterial({
+    color: palette ? 0x4a3328 : 0x5a4632,
+    roughness: 0.95,
+  });
   const trunk = new THREE.Mesh(
     new THREE.CylinderGeometry(0.17 * scale, 0.3 * scale, trunkH, 9),
     trunkMat,
@@ -95,11 +98,9 @@ function makeTree({ x, z, scale = 1, seed = 1, big = false }) {
   trunk.receiveShadow = true;
   group.add(trunk);
 
-  const leafMats = [
-    new THREE.MeshStandardMaterial({ color: 0x4c7d3c, roughness: 0.92, flatShading: true }),
-    new THREE.MeshStandardMaterial({ color: 0x5d8f45, roughness: 0.9, flatShading: true }),
-    new THREE.MeshStandardMaterial({ color: 0x3f6b35, roughness: 0.94, flatShading: true }),
-  ];
+  const leafMats = (palette || [0x4c7d3c, 0x5d8f45, 0x3f6b35]).map(
+    (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, flatShading: true }),
+  );
 
   const blobs = [];
   if (big) {
@@ -158,13 +159,147 @@ function makeFenceSegment(x1, z1, x2, z2, mat, postMat) {
   return group;
 }
 
-export function createWorld({ scene, renderer, textures, house }) {
+function makeCloudTexture() {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 128;
+  const g = c.getContext('2d');
+  const rand = (() => {
+    let s = 77;
+    return () => {
+      s = (s * 16807) % 2147483647;
+      return s / 2147483647;
+    };
+  })();
+  for (let i = 0; i < 20; i++) {
+    const x = 24 + rand() * 208;
+    const y = 40 + rand() * 52;
+    const r = 16 + rand() * 34;
+    const grd = g.createRadialGradient(x, y, 0, x, y, r);
+    grd.addColorStop(0, 'rgba(255,255,255,0.6)');
+    grd.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grd;
+    g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+function makeWaterfallTexture() {
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 256;
+  const g = c.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 0, 256);
+  grd.addColorStop(0, 'rgba(220,245,255,0.95)');
+  grd.addColorStop(0.65, 'rgba(185,228,246,0.6)');
+  grd.addColorStop(1, 'rgba(185,228,246,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 64, 256);
+  const rand = (() => {
+    let s = 191;
+    return () => {
+      s = (s * 16807) % 2147483647;
+      return s / 2147483647;
+    };
+  })();
+  for (let i = 0; i < 26; i++) {
+    g.fillStyle = `rgba(255,255,255,${0.12 + rand() * 0.4})`;
+    g.fillRect(rand() * 62, rand() * 40, 0.8 + rand() * 2.2, 120 + rand() * 130);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+function makeTorii() {
+  const g = new THREE.Group();
+  const red = new THREE.MeshStandardMaterial({ color: 0xb33528, roughness: 0.62 });
+  const black = new THREE.MeshStandardMaterial({ color: 0x211f1d, roughness: 0.72 });
+  for (const sx of [-1, 1]) {
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 4.4, 12), red);
+    pillar.position.set(sx * 2.0, 2.2, 0);
+    pillar.castShadow = true;
+    g.add(pillar);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.24, 12), black);
+    cap.position.set(sx * 2.0, 4.46, 0);
+    g.add(cap);
+  }
+  g.add(box(5.6, 0.3, 0.34, red, 0, 4.08, 0));
+  g.add(box(4.7, 0.22, 0.28, red, 0, 3.4, 0));
+  g.add(box(6.0, 0.22, 0.42, black, 0, 4.36, 0));
+  g.add(box(0.52, 0.62, 0.12, black, 0, 3.76, 0.17));
+  return g;
+}
+
+function makeStoneLantern() {
+  const g = new THREE.Group();
+  const stone = new THREE.MeshStandardMaterial({ color: 0x9b9489, roughness: 0.96 });
+  const light = new THREE.MeshStandardMaterial({
+    color: 0xffe3ae,
+    emissive: 0xffb457,
+    emissiveIntensity: 1.3,
+    roughness: 0.6,
+  });
+  g.add(box(0.62, 0.12, 0.62, stone, 0, 0.06, 0));
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 0.9, 10), stone);
+  shaft.position.y = 0.57;
+  shaft.castShadow = true;
+  g.add(shaft);
+  g.add(box(0.46, 0.32, 0.46, light, 0, 1.18, 0));
+  g.add(box(0.6, 0.1, 0.6, stone, 0, 1.39, 0));
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(0.48, 0.34, 4), stone);
+  cap.rotation.y = Math.PI / 4;
+  cap.position.y = 1.6;
+  cap.castShadow = true;
+  g.add(cap);
+  g.add(box(0.16, 0.16, 0.16, stone, 0, 1.84, 0));
+  return g;
+}
+
+function makeBamboo(seed = 1, count = 7) {
+  const g = new THREE.Group();
+  const rand = (() => {
+    let s = seed * 7919;
+    return () => {
+      s = (s * 16807) % 2147483647;
+      return s / 2147483647;
+    };
+  })();
+  const stalkMat = new THREE.MeshStandardMaterial({ color: 0x6f9b45, roughness: 0.8 });
+  const leafMat = new THREE.MeshStandardMaterial({
+    color: 0x7fae52,
+    roughness: 0.9,
+    side: THREE.DoubleSide,
+  });
+  for (let i = 0; i < count; i++) {
+    const h = 3.8 + rand() * 3.2;
+    const x = (rand() - 0.5) * 1.6;
+    const z = (rand() - 0.5) * 1.6;
+    const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, h, 7), stalkMat);
+    stalk.position.set(x, h / 2, z);
+    stalk.rotation.z = (rand() - 0.5) * 0.08;
+    stalk.castShadow = true;
+    g.add(stalk);
+    for (let k = 0; k < 5; k++) {
+      const leaf = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.11), leafMat);
+      leaf.position.set(x + (rand() - 0.5) * 0.7, h * (0.55 + rand() * 0.4), z + (rand() - 0.5) * 0.7);
+      leaf.rotation.set(rand() * 0.8 - 0.4, rand() * Math.PI, rand() * 0.6);
+      g.add(leaf);
+    }
+  }
+  return g;
+}
+
+export function createWorld({ scene, renderer, textures, house, theme = 'villa' }) {
+  const pagoda = theme === 'pagoda';
   const group = new THREE.Group();
   group.name = 'entorno';
   scene.add(group);
 
   /* ------------------------------------------------------------------ cielo */
-  const sky = makeSky();
+  const sky = makeSky(pagoda);
   scene.add(sky.mesh);
 
   const envScene = new THREE.Scene();
@@ -199,70 +334,246 @@ export function createWorld({ scene, renderer, textures, house }) {
   fill.position.set(6, 14, -12);
   group.add(fill);
 
-  scene.fog = new THREE.Fog(0xd7e3ea, 75, 240);
+  scene.fog = new THREE.Fog(pagoda ? 0xe6e0e2 : 0xd7e3ea, pagoda ? 60 : 75, pagoda ? 210 : 240);
 
   /* ---------------------------------------------------------------- terreno */
-  const grassTex = cloneRepeat(textures.grass, 70, 70);
-  const groundMat = new THREE.MeshStandardMaterial({
-    map: grassTex,
-    normalMap: cloneRepeat(textures.normal.grass, 70, 70),
-    normalScale: new THREE.Vector2(0.65, 0.65),
-    color: 0x9aa87a,
-    roughness: 1,
-  });
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(160, 72), groundMat);
-  ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
-  group.add(ground);
+  if (pagoda) {
+    const islandRadius = 24;
+    const islandMat = new THREE.MeshStandardMaterial({
+      map: cloneRepeat(textures.grass, 30, 30),
+      normalMap: cloneRepeat(textures.normal.grass, 30, 30),
+      normalScale: new THREE.Vector2(0.7, 0.7),
+      color: 0x8fa86f,
+      roughness: 1,
+    });
+    const islandTop = new THREE.Mesh(new THREE.CircleGeometry(islandRadius, 72), islandMat);
+    islandTop.rotation.x = -Math.PI / 2;
+    islandTop.receiveShadow = true;
+    group.add(islandTop);
 
-  const gravelMat = new THREE.MeshStandardMaterial({
-    map: cloneRepeat(textures.gravel, 5, 12),
-    normalMap: cloneRepeat(textures.normal.gravel, 5, 12),
-    normalScale: new THREE.Vector2(0.9, 0.9),
-    color: 0xc9c3b6,
-    roughness: 1,
-  });
-  const drive = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 10.5), gravelMat);
-  drive.rotation.x = -Math.PI / 2;
-  drive.position.set(6.6, 0.012, 10.6);
-  drive.receiveShadow = true;
-  group.add(drive);
+    const rockMat = new THREE.MeshStandardMaterial({
+      map: cloneRepeat(textures.stone, 5, 2),
+      normalMap: cloneRepeat(textures.normal.stone, 5, 2),
+      normalScale: new THREE.Vector2(1.2, 1.2),
+      color: 0x948b7d,
+      roughness: 0.98,
+    });
+    const deco = new THREE.Group();
 
-  const path = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 4.2), gravelMat);
-  path.rotation.x = -Math.PI / 2;
-  path.position.set(-0.3, 0.014, 8.9);
-  path.receiveShadow = true;
-  group.add(path);
+    // borde rocoso irregular
+    for (let i = 0; i < 46; i++) {
+      const a = (i / 46) * Math.PI * 2;
+      const r = islandRadius - 0.1 + Math.sin(a * 5) * 0.5;
+      const rock = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.7 + Math.random() * 1.1, 0),
+        rockMat,
+      );
+      rock.position.set(Math.cos(a) * r, 0.1 + Math.random() * 0.5, Math.sin(a) * r);
+      rock.scale.set(1 + Math.random(), 0.8 + Math.random() * 0.8, 1 + Math.random());
+      rock.rotation.set(Math.random(), Math.random(), Math.random());
+      rock.castShadow = true;
+      rock.receiveShadow = true;
+      deco.add(rock);
+    }
 
-  const asphaltMat = new THREE.MeshStandardMaterial({
-    map: cloneRepeat(textures.asphalt, 30, 2),
-    normalMap: cloneRepeat(textures.normal.asphalt, 30, 2),
-    normalScale: new THREE.Vector2(0.7, 0.7),
-    color: 0x777b7e,
-    roughness: 0.95,
-  });
-  const road = new THREE.Mesh(new THREE.PlaneGeometry(90, 5.4), asphaltMat);
-  road.rotation.x = -Math.PI / 2;
-  road.position.set(0, 0.008, 16.4);
-  road.receiveShadow = true;
-  group.add(road);
+    // falda de roca bajo la isla
+    const under = new THREE.Mesh(new THREE.ConeGeometry(islandRadius * 0.99, 28, 48, 5), rockMat);
+    under.rotation.x = Math.PI;
+    under.position.y = -14.04;
+    under.castShadow = true;
+    under.receiveShadow = true;
+    group.add(under);
+    const core = new THREE.Mesh(
+      new THREE.ConeGeometry(islandRadius * 0.7, 20, 40, 3),
+      new THREE.MeshStandardMaterial({
+        map: cloneRepeat(textures.stone, 3, 3),
+        color: 0x6d655b,
+        roughness: 1,
+      }),
+    );
+    core.rotation.x = Math.PI;
+    core.position.y = -11.03;
+    group.add(core);
 
-  const curbMat = new THREE.MeshStandardMaterial({ color: 0xb9b3a6, roughness: 0.9 });
-  group.add(box(90, 0.16, 0.24, curbMat, 0, 0.08, 13.6));
+    // cascada en el borde
+    const fallMat = new THREE.MeshBasicMaterial({
+      map: makeWaterfallTexture(),
+      transparent: true,
+      opacity: 0.92,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+    });
+    const poolMat = new THREE.MeshStandardMaterial({
+      color: 0x6fb9d8,
+      transparent: true,
+      opacity: 0.6,
+      roughness: 0.15,
+      metalness: 0.2,
+      emissive: 0x123a4a,
+      side: THREE.DoubleSide,
+    });
+    const fallX = 17.4;
+    const fallZ = 18.0;
+    const fall = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 22), fallMat);
+    fall.position.set(fallX, -10.4, fallZ);
+    fall.rotation.y = Math.atan2(fallX, fallZ);
+    group.add(fall);
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(1.3, 20), poolMat);
+    pool.rotation.x = -Math.PI / 2;
+    pool.position.set(15.4, 0.03, 15.9);
+    group.add(pool);
 
-  // setos y parterres junto a la fachada
-  const hedgeMat = new THREE.MeshStandardMaterial({ color: 0x3f6f37, roughness: 0.95 });
-  for (const [hx, hz, hw, hh] of [
-    [-5.1, 4.6, 1.6, 0.7],
-    [5.0, 4.55, 1.4, 0.65],
-    [-5.4, 5.3, 1.0, 0.5],
-  ]) {
-    const hedge = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), hedgeMat);
-    hedge.scale.set(hw, hh, hw * 0.7);
-    hedge.position.set(hx, hh * 0.8, hz);
-    hedge.castShadow = true;
-    hedge.receiveShadow = true;
-    group.add(hedge);
+    // rocas colgantes bajo el borde
+    for (let i = 0; i < 16; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = islandRadius * (0.55 + Math.random() * 0.4);
+      const hang = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.35 + Math.random() * 0.9, 0),
+        rockMat,
+      );
+      hang.position.set(Math.cos(a) * r, -1 - Math.random() * 5, Math.sin(a) * r);
+      hang.scale.set(1, 0.7 + Math.random() * 0.8, 1);
+      hang.rotation.set(Math.random(), Math.random(), Math.random());
+      hang.castShadow = true;
+      deco.add(hang);
+    }
+
+    // mar de nubes y niebla al pie
+    const cloudTex = makeCloudTexture();
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2 + Math.random() * 0.2;
+      const r = 10 + Math.random() * 26;
+      const sp = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: cloudTex,
+          transparent: true,
+          opacity: 0.42,
+          depthWrite: false,
+          toneMapped: false,
+          fog: false,
+        }),
+      );
+      sp.position.set(Math.cos(a) * r, -7 - Math.random() * 9, Math.sin(a) * r);
+      sp.scale.set(20 + Math.random() * 24, 8 + Math.random() * 10, 1);
+      group.add(sp);
+    }
+
+    // islas flotantes lejanas
+    const farIslandMat = new THREE.MeshStandardMaterial({
+      map: cloneRepeat(textures.grass, 5, 5),
+      color: 0x83a06a,
+      roughness: 1,
+    });
+    for (const [ix, iy, iz, s] of [
+      [-58, -5, -42, 1.1],
+      [52, 3, -34, 0.85],
+      [36, -11, 48, 1.2],
+      [-46, 6, 40, 0.7],
+    ]) {
+      const isle = new THREE.Group();
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(6 * s, 4.6 * s, 1.1 * s, 20), farIslandMat);
+      const rock = new THREE.Mesh(new THREE.ConeGeometry(4.8 * s, 10 * s, 20, 3), rockMat);
+      rock.rotation.x = Math.PI;
+      rock.position.y = -5.2 * s;
+      isle.add(top, rock);
+      isle.position.set(ix, iy, iz);
+      deco.add(isle);
+    }
+
+    // puerta torii, faroles y bambú
+    const torii = makeTorii();
+    torii.position.set(0, 0, 13.2);
+    deco.add(torii);
+
+    for (const [lx, lz] of [[-5.9, 8.4], [6.7, 9.6], [-2.7, 12.2]]) {
+      const lantern = makeStoneLantern();
+      lantern.position.set(lx, 0, lz);
+      deco.add(lantern);
+    }
+
+    for (const [bx, bz, seed] of [[-10.5, 6.5, 3], [9.2, -6.5, 7], [-8.5, -8.5, 11]]) {
+      const bamboo = makeBamboo(seed, 7);
+      bamboo.position.set(bx, 0, bz);
+      deco.add(bamboo);
+    }
+
+    // rocas con musgo
+    for (const [rx, rz, rs] of [[-13, 3, 1.3], [12.5, 5, 1.1], [-9, 12, 0.9]]) {
+      const boulder = new THREE.Mesh(new THREE.IcosahedronGeometry(rs, 1), rockMat);
+      boulder.position.set(rx, rs * 0.45, rz);
+      boulder.scale.y = 0.6;
+      boulder.rotation.y = rx;
+      boulder.castShadow = true;
+      boulder.receiveShadow = true;
+      deco.add(boulder);
+    }
+
+    group.add(deco);
+    mergeStatic(deco);
+  } else {
+    const grassTex = cloneRepeat(textures.grass, 70, 70);
+    const groundMat = new THREE.MeshStandardMaterial({
+      map: grassTex,
+      normalMap: cloneRepeat(textures.normal.grass, 70, 70),
+      normalScale: new THREE.Vector2(0.65, 0.65),
+      color: 0x9aa87a,
+      roughness: 1,
+    });
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(160, 72), groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    group.add(ground);
+
+    const gravelMat = new THREE.MeshStandardMaterial({
+      map: cloneRepeat(textures.gravel, 5, 12),
+      normalMap: cloneRepeat(textures.normal.gravel, 5, 12),
+      normalScale: new THREE.Vector2(0.9, 0.9),
+      color: 0xc9c3b6,
+      roughness: 1,
+    });
+    const drive = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 10.5), gravelMat);
+    drive.rotation.x = -Math.PI / 2;
+    drive.position.set(6.6, 0.012, 10.6);
+    drive.receiveShadow = true;
+    group.add(drive);
+
+    const path = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 4.2), gravelMat);
+    path.rotation.x = -Math.PI / 2;
+    path.position.set(-0.3, 0.014, 8.9);
+    path.receiveShadow = true;
+    group.add(path);
+
+    const asphaltMat = new THREE.MeshStandardMaterial({
+      map: cloneRepeat(textures.asphalt, 30, 2),
+      normalMap: cloneRepeat(textures.normal.asphalt, 30, 2),
+      normalScale: new THREE.Vector2(0.7, 0.7),
+      color: 0x777b7e,
+      roughness: 0.95,
+    });
+    const road = new THREE.Mesh(new THREE.PlaneGeometry(90, 5.4), asphaltMat);
+    road.rotation.x = -Math.PI / 2;
+    road.position.set(0, 0.008, 16.4);
+    road.receiveShadow = true;
+    group.add(road);
+
+    const curbMat = new THREE.MeshStandardMaterial({ color: 0xb9b3a6, roughness: 0.9 });
+    group.add(box(90, 0.16, 0.24, curbMat, 0, 0.08, 13.6));
+
+    // setos y parterres junto a la fachada
+    const hedgeMat = new THREE.MeshStandardMaterial({ color: 0x3f6f37, roughness: 0.95 });
+    for (const [hx, hz, hw, hh] of [
+      [-5.1, 4.6, 1.6, 0.7],
+      [5.0, 4.55, 1.4, 0.65],
+      [-5.4, 5.3, 1.0, 0.5],
+    ]) {
+      const hedge = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), hedgeMat);
+      hedge.scale.set(hw, hh, hw * 0.7);
+      hedge.position.set(hx, hh * 0.8, hz);
+      hedge.castShadow = true;
+      hedge.receiveShadow = true;
+      group.add(hedge);
+    }
   }
 
   /* ------------------------------------------------------------ material de obra */
@@ -312,66 +623,95 @@ export function createWorld({ scene, renderer, textures, house }) {
   group.add(brickStack);
 
   /* ----------------------------------------------------------------- árboles */
+  const sakura = [0xe89ab0, 0xf3b9c8, 0xd9849b];
   const trees = [];
-  const shadeTree = makeTree({ x: SITE.treeShade.x, z: SITE.treeShade.z, scale: 1, seed: 3, big: true });
+  const shadeTree = makeTree({
+    x: SITE.treeShade.x,
+    z: SITE.treeShade.z,
+    scale: 1,
+    seed: 3,
+    big: true,
+    palette: pagoda ? sakura : null,
+  });
   group.add(shadeTree.group);
   trees.push(shadeTree);
 
-  const otherTrees = [
-    { x: 13.5, z: 10.5, scale: 1.25, seed: 11 },
-    { x: -15.5, z: 11.5, scale: 1.5, seed: 23 },
-    { x: 12.5, z: -8.5, scale: 1.15, seed: 37 },
-    { x: -14.5, z: -9.5, scale: 1.3, seed: 41 },
-    { x: 17.5, z: 1.5, scale: 0.95, seed: 53 },
-    { x: -19, z: 2.5, scale: 1.05, seed: 67 },
-  ];
+  const otherTrees = pagoda
+    ? [
+        { x: 13.5, z: 8.5, scale: 1.1, seed: 11 },
+        { x: -15.5, z: 11.5, scale: 1.3, seed: 23 },
+        { x: 12.5, z: -8.5, scale: 1.0, seed: 37 },
+        { x: -14.5, z: -9.5, scale: 1.15, seed: 41 },
+      ]
+    : [
+        { x: 13.5, z: 10.5, scale: 1.25, seed: 11 },
+        { x: -15.5, z: 11.5, scale: 1.5, seed: 23 },
+        { x: 12.5, z: -8.5, scale: 1.15, seed: 37 },
+        { x: -14.5, z: -9.5, scale: 1.3, seed: 41 },
+        { x: 17.5, z: 1.5, scale: 0.95, seed: 53 },
+        { x: -19, z: 2.5, scale: 1.05, seed: 67 },
+      ];
   for (const t of otherTrees) {
-    const tree = makeTree(t);
+    const tree = makeTree({ ...t, palette: pagoda ? sakura : null });
     group.add(tree.group);
     trees.push(tree);
   }
 
-  const bushMat = new THREE.MeshStandardMaterial({ color: 0x537f3a, roughness: 0.95, flatShading: true });
-  for (let i = 0; i < 9; i++) {
-    const b = new THREE.Mesh(new THREE.IcosahedronGeometry(0.35 + Math.random() * 0.25, 1), bushMat);
-    b.position.set(-11 + Math.random() * 22, 0.25, 7 + Math.random() * 4);
-    if (Math.abs(b.position.x - SITE.bench.x) < 2.6 && Math.abs(b.position.z - SITE.bench.z) < 2.2) continue;
-    b.castShadow = true;
-    b.receiveShadow = true;
-    group.add(b);
+  if (!pagoda) {
+    const bushMat = new THREE.MeshStandardMaterial({
+      color: 0x537f3a,
+      roughness: 0.95,
+      flatShading: true,
+    });
+    for (let i = 0; i < 9; i++) {
+      const b = new THREE.Mesh(new THREE.IcosahedronGeometry(0.35 + Math.random() * 0.25, 1), bushMat);
+      b.position.set(-11 + Math.random() * 22, 0.25, 7 + Math.random() * 4);
+      if (
+        Math.abs(b.position.x - SITE.bench.x) < 2.6 &&
+        Math.abs(b.position.z - SITE.bench.z) < 2.2
+      )
+        continue;
+      b.castShadow = true;
+      b.receiveShadow = true;
+      group.add(b);
+    }
   }
 
   /* ------------------------------------------------------------------ valla */
-  const fenceMat = new THREE.MeshStandardMaterial({
-    map: cloneRepeat(textures.wood, 2, 1),
-    normalMap: cloneRepeat(textures.normal.wood, 2, 1),
-    normalScale: new THREE.Vector2(0.7, 0.7),
-    color: 0x8e6c46,
-    roughness: 0.9,
-  });
-  const postMat = new THREE.MeshStandardMaterial({ color: 0x6d5335, roughness: 0.95 });
-  const fence = new THREE.Group();
-  fence.add(makeFenceSegment(-17, 13.2, 17, 13.2, fenceMat, postMat));
-  fence.add(makeFenceSegment(-17, 13.2, -17, -11, fenceMat, postMat));
-  fence.add(makeFenceSegment(17, 13.2, 17, -11, fenceMat, postMat));
-  mergeStatic(fence);
-  group.add(fence);
+  if (!pagoda) {
+    const fenceMat = new THREE.MeshStandardMaterial({
+      map: cloneRepeat(textures.wood, 2, 1),
+      normalMap: cloneRepeat(textures.normal.wood, 2, 1),
+      normalScale: new THREE.Vector2(0.7, 0.7),
+      color: 0x8e6c46,
+      roughness: 0.9,
+    });
+    const postMat = new THREE.MeshStandardMaterial({ color: 0x6d5335, roughness: 0.95 });
+    const fence = new THREE.Group();
+    fence.add(makeFenceSegment(-17, 13.2, 17, 13.2, fenceMat, postMat));
+    fence.add(makeFenceSegment(-17, 13.2, -17, -11, fenceMat, postMat));
+    fence.add(makeFenceSegment(17, 13.2, 17, -11, fenceMat, postMat));
+    mergeStatic(fence);
+    group.add(fence);
+  }
 
   /* ---------------------------------------------------------- casas lejanas */
-  const farMat = new THREE.MeshStandardMaterial({ color: 0xded6c6, roughness: 0.9 });
-  const farRoofMat = new THREE.MeshStandardMaterial({ color: 0x9c5b41, roughness: 0.9 });
-  for (const [fx, fz, fw, fh] of [
-    [-32, -18, 9, 4],
-    [34, -8, 11, 5],
-    [18, -32, 8, 4],
-  ]) {
-    const h = new THREE.Mesh(new THREE.BoxGeometry(fw, fh, fw * 0.7), farMat);
-    h.position.set(fx, fh / 2, fz);
-    group.add(h);
-    const r = new THREE.Mesh(new THREE.ConeGeometry(fw * 0.8, fh * 0.7, 4), farRoofMat);
-    r.position.set(fx, fh + fh * 0.32, fz);
-    r.rotation.y = Math.PI / 4;
-    group.add(r);
+  if (!pagoda) {
+    const farMat = new THREE.MeshStandardMaterial({ color: 0xded6c6, roughness: 0.9 });
+    const farRoofMat = new THREE.MeshStandardMaterial({ color: 0x9c5b41, roughness: 0.9 });
+    for (const [fx, fz, fw, fh] of [
+      [-32, -18, 9, 4],
+      [34, -8, 11, 5],
+      [18, -32, 8, 4],
+    ]) {
+      const h = new THREE.Mesh(new THREE.BoxGeometry(fw, fh, fw * 0.7), farMat);
+      h.position.set(fx, fh / 2, fz);
+      group.add(h);
+      const r = new THREE.Mesh(new THREE.ConeGeometry(fw * 0.8, fh * 0.7, 4), farRoofMat);
+      r.position.set(fx, fh + fh * 0.32, fz);
+      r.rotation.y = Math.PI / 4;
+      group.add(r);
+    }
   }
 
   /* -------------------------------------------------------- colinas y nubes */
@@ -383,15 +723,17 @@ export function createWorld({ scene, renderer, textures, house }) {
       return s / 2147483647;
     };
   })();
-  for (let i = 0; i < 9; i++) {
-    const a = (i / 9) * Math.PI * 2 + 0.2;
-    const r = 110 + randH() * 30;
-    const geo = new THREE.SphereGeometry(36 + randH() * 26, 16, 7, 0, Math.PI * 2, 0, Math.PI / 2);
-    const h = new THREE.Mesh(geo, hillMat);
-    h.position.set(Math.sin(a) * r, -2 - randH() * 3, Math.cos(a) * r);
-    h.scale.set(1.5, 0.34 + randH() * 0.2, 1.0);
-    h.rotation.y = randH() * Math.PI;
-    group.add(h);
+  if (!pagoda) {
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2 + 0.2;
+      const r = 110 + randH() * 30;
+      const geo = new THREE.SphereGeometry(36 + randH() * 26, 16, 7, 0, Math.PI * 2, 0, Math.PI / 2);
+      const h = new THREE.Mesh(geo, hillMat);
+      h.position.set(Math.sin(a) * r, -2 - randH() * 3, Math.cos(a) * r);
+      h.scale.set(1.5, 0.34 + randH() * 0.2, 1.0);
+      h.rotation.y = randH() * Math.PI;
+      group.add(h);
+    }
   }
   const cloudCanvas = document.createElement('canvas');
   cloudCanvas.width = 256;
