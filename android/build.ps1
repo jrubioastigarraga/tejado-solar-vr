@@ -8,9 +8,8 @@
 # Prepara los assets automaticamente: dist/ -> assets/site (tarea Gradle).
 
 param(
-    [string]$Jdk = "C:\Users\irjrubio\.jdk21\jdk-21.0.13+9",
-    [string]$Sdk = "C:\Users\irjrubio\.android-sdk",
-    [string]$Gradle = "C:\Users\irjrubio\.gradle-dist\gradle-8.9\bin\gradle.bat",
+    [string]$Jdk,
+    [string]$Sdk,
     [switch]$Install,
     [switch]$SkipWeb
 )
@@ -19,21 +18,39 @@ $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $repo = Split-Path -Parent $root
 
-if (-not (Test-Path (Join-Path $Jdk 'bin\java.exe'))) {
+function Find-Jdk {
     if ($env:JAVA_HOME -and (Test-Path (Join-Path $env:JAVA_HOME 'bin\java.exe'))) {
-        $Jdk = $env:JAVA_HOME
-    } else {
-        throw "No encuentro el JDK. Pasa -Jdk <ruta> o define JAVA_HOME (JDK 17/21)."
+        return $env:JAVA_HOME
     }
+    foreach ($dir in (Get-ChildItem -Path $HOME -Directory -Filter '.jdk*' -ErrorAction SilentlyContinue | Sort-Object Name -Descending)) {
+        $jdk = Get-ChildItem -Path $dir.FullName -Directory -Filter 'jdk-*' -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending | Select-Object -First 1
+        if ($jdk -and (Test-Path (Join-Path $jdk.FullName 'bin\java.exe'))) { return $jdk.FullName }
+        if (Test-Path (Join-Path $dir.FullName 'bin\java.exe')) { return $dir.FullName }
+    }
+    return $null
 }
-if (-not (Test-Path $Sdk)) {
-    if ($env:ANDROID_HOME -and (Test-Path $env:ANDROID_HOME)) {
-        $Sdk = $env:ANDROID_HOME
-    } elseif ($env:ANDROID_SDK_ROOT -and (Test-Path $env:ANDROID_SDK_ROOT)) {
-        $Sdk = $env:ANDROID_SDK_ROOT
-    } else {
-        throw "No encuentro el Android SDK. Pasa -Sdk <ruta> o define ANDROID_HOME."
+
+function Find-AndroidSdk {
+    $candidates = @(
+        $env:ANDROID_HOME,
+        $env:ANDROID_SDK_ROOT,
+        (Join-Path $HOME '.android-sdk'),
+        (Join-Path $env:LOCALAPPDATA 'Android\Sdk')
+    )
+    foreach ($path in $candidates) {
+        if ($path -and (Test-Path $path)) { return $path }
     }
+    return $null
+}
+
+if (-not $Jdk) { $Jdk = Find-Jdk }
+if (-not $Jdk -or -not (Test-Path (Join-Path $Jdk 'bin\java.exe'))) {
+    throw "No encuentro el JDK. Pasa -Jdk <ruta> o define JAVA_HOME (JDK 17/21)."
+}
+if (-not $Sdk) { $Sdk = Find-AndroidSdk }
+if (-not $Sdk -or -not (Test-Path $Sdk)) {
+    throw "No encuentro el Android SDK. Pasa -Sdk <ruta> o define ANDROID_HOME."
 }
 
 $env:JAVA_HOME = $Jdk
@@ -51,17 +68,16 @@ if (-not (Test-Path (Join-Path $repo 'dist\index.html'))) {
     throw "No existe dist/index.html. Ejecuta 'npm run build' en la raiz del repo."
 }
 
-if (-not (Test-Path (Join-Path $root 'local.properties'))) {
-    $sdkesc = $Sdk -replace '\\', '\\\\' -replace ':', '\:'
-    "sdk.dir=$sdkesc" | Set-Content (Join-Path $root 'local.properties') -Encoding ASCII
+$propsFile = Join-Path $root 'local.properties'
+$props = @()
+if (Test-Path $propsFile) { $props = @(Get-Content $propsFile) }
+if (-not ($props -match '^\s*sdk\.dir\s*=')) {
+    $sdkesc = ($Sdk -replace '\\', '\\') -replace ':', '\:'
+    $props += "sdk.dir=$sdkesc"
+    Set-Content -Path $propsFile -Value $props -Encoding ASCII
 }
 
-$gradleCmd = $Gradle
-if (-not (Test-Path $gradleCmd)) {
-    $gradleCmd = Join-Path $root 'gradlew.bat'
-}
-
-& $gradleCmd --console=plain assembleRelease
+& (Join-Path $root 'gradlew.bat') --console=plain assembleRelease
 if ($LASTEXITCODE -ne 0) { throw "Fallo el build Android" }
 
 $apk = Join-Path $root 'app\build\outputs\apk\release\app-release.apk'

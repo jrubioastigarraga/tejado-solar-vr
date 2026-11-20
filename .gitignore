@@ -7,6 +7,10 @@ shot.png
 Thumbs.db
 android/.gradle/
 android/local.properties
+# Claves de firma: nunca en el repositorio
+*.jks
+*.keystore
+android/app/keystore/
 android/app/build/
 android/build/
 android/app/src/main/assets/site/

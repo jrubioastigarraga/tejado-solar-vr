@@ -28,7 +28,7 @@ adb install -r TejadoSolarVR-pico4.apk
 ```
 
 Luego en el visor: **Biblioteca → Desconocidas → Tejado Solar VR**.
-La APK está firmada con una clave propia (`android/app/keystore/tejadosolar.jks`).
+La APK está firmada con una clave propia que se guarda fuera del repositorio (ver [APK para Pico 4](#apk-para-pico-4)).
 
 ### Opción B · Navegador
 
@@ -117,8 +117,28 @@ cd android
 ```
 
 Requiere JDK 17/21 y Android SDK (platform 34). Los assets se copian solos con la tarea
-Gradle `syncWebAssets`. La firma está en `android/app/keystore/tejadosolar.jks`
-(alias y clave `tejadosolar`); consérvala para que las actualizaciones se instalen encima.
+Gradle `syncWebAssets`.
+
+Para firmar el APK, crea `android/local.properties` (no se sube al repositorio) con tus
+credenciales; también puedes usar las variables de entorno equivalentes:
+
+```properties
+sdk.dir=C\:\\ruta\\al\\Android\\Sdk
+tejadosolar.storeFile=app/keystore/tejadosolar-release.jks
+tejadosolar.storePassword=TU_CONTRASENA
+tejadosolar.keyAlias=tejadosolar
+tejadosolar.keyPassword=TU_CONTRASENA
+```
+
+| Variable de entorno | Propiedad |
+| --- | --- |
+| `TEJADOSOLAR_STORE_FILE` | `tejadosolar.storeFile` |
+| `TEJADOSOLAR_STORE_PASSWORD` | `tejadosolar.storePassword` |
+| `TEJADOSOLAR_KEY_ALIAS` | `tejadosolar.keyAlias` |
+| `TEJADOSOLAR_KEY_PASSWORD` | `tejadosolar.keyPassword` |
+
+Guarda el keystore y su contraseña fuera del repositorio (gestor de contraseñas o copia
+segura): sin ellos no podrás firmar actualizaciones que se instalen encima.
 
 ```
 index.html            interfaz de inicio, HUD y resultados

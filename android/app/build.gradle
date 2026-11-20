@@ -2,6 +2,25 @@ plugins {
     id 'com.android.application'
 }
 
+// Credenciales de firma: NUNCA en el repositorio. Se leen de android/local.properties
+// (ignorado por git) o de variables de entorno.
+def signingProps = new Properties()
+def signingPropsFile = rootProject.file('local.properties')
+if (signingPropsFile.exists()) {
+    signingPropsFile.withInputStream { signingProps.load(it) }
+}
+
+def signingValue = { String key, String envName ->
+    def value = signingProps.getProperty(key) ?: System.getenv(envName)
+    return value == null || value.trim().isEmpty() ? null : value.trim()
+}
+
+def releaseStoreFile = signingValue('tejadosolar.storeFile', 'TEJADOSOLAR_STORE_FILE')
+def releaseStorePassword = signingValue('tejadosolar.storePassword', 'TEJADOSOLAR_STORE_PASSWORD')
+def releaseKeyAlias = signingValue('tejadosolar.keyAlias', 'TEJADOSOLAR_KEY_ALIAS')
+def releaseKeyPassword = signingValue('tejadosolar.keyPassword', 'TEJADOSOLAR_KEY_PASSWORD')
+def hasReleaseSigning = [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword].every { it != null }
+
 def webDist = file("$rootDir/../dist")
 def generatedAssets = layout.buildDirectory.dir("generated/webAssets")
 
@@ -19,10 +38,12 @@ android {
 
     signingConfigs {
         release {
-            storeFile file('keystore/tejadosolar.jks')
-            storePassword 'tejadosolar'
-            keyAlias 'tejadosolar'
-            keyPassword 'tejadosolar'
+            if (hasReleaseSigning) {
+                storeFile rootProject.file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
         }
     }
 
@@ -46,6 +67,19 @@ android {
     sourceSets {
         main {
             assets.srcDirs += [generatedAssets.get().asFile]
+        }
+    }
+}
+
+if (!hasReleaseSigning) {
+    tasks.matching { it.name == 'assembleRelease' || it.name == 'bundleRelease' }.configureEach {
+        doFirst {
+            throw new GradleException(
+                "Faltan credenciales de firma. Anade tejadosolar.storeFile, tejadosolar.storePassword, " +
+                "tejadosolar.keyAlias y tejadosolar.keyPassword a android/local.properties " +
+                "(o define TEJADOSOLAR_STORE_FILE, TEJADOSOLAR_STORE_PASSWORD, TEJADOSOLAR_KEY_ALIAS y " +
+                "TEJADOSOLAR_KEY_PASSWORD)."
+            )
         }
     }
 }
