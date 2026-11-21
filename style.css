@@ -770,6 +770,39 @@ body.locked #hint {
   }
 }
 
+/* --------------------------------------------------------- tema pagoda */
+body.theme-pagoda .eyebrow,
+body.theme-pagoda .intro-block h2,
+body.theme-pagoda .results-card .eyebrow {
+  color: #ffb3c8;
+}
+
+body.theme-pagoda .kicker .dot {
+  background: #ff9fbd;
+  box-shadow: 0 0 12px #ff9fbd;
+}
+
+body.theme-pagoda .theme-card.active {
+  border-color: rgba(255, 159, 189, 0.7);
+  background: rgba(58, 22, 38, 0.6);
+}
+
+body.theme-pagoda .chip.on {
+  border-color: rgba(255, 159, 189, 0.7);
+  color: #ffc4d5;
+  background: rgba(255, 159, 189, 0.1);
+}
+
+body.theme-pagoda .intro-card,
+body.theme-pagoda .results-card {
+  border-color: rgba(255, 176, 200, 0.22);
+}
+
+body.theme-pagoda .score b,
+body.theme-pagoda .stars {
+  color: #ffcf8a;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
