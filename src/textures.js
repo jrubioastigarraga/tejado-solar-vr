@@ -72,6 +72,26 @@ function normalTexture(c, repeatX = 1, repeatY = 1) {
   return t;
 }
 
+/** Mapa de rugosidad derivado de la luminancia: el brillo deja de ser plano. */
+function roughFrom(src, base, span) {
+  const w = src.width;
+  const h = src.height;
+  const data = src.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data;
+  const out = canvas(w, h);
+  const g = out.getContext('2d');
+  const img = g.createImageData(w, h);
+  for (let i = 0; i < w * h; i++) {
+    const lum = (data[i * 4] * 0.299 + data[i * 4 + 1] * 0.587 + data[i * 4 + 2] * 0.114) / 255;
+    const v = Math.max(0, Math.min(255, Math.round(255 * (base + span * (lum - 0.5)))));
+    img.data[i * 4] = v;
+    img.data[i * 4 + 1] = v;
+    img.data[i * 4 + 2] = v;
+    img.data[i * 4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  return out;
+}
+
 export function cloneRepeat(tex, x, y) {
   const t = tex.clone();
   t.needsUpdate = true;
@@ -860,6 +880,13 @@ export function buildTextures(renderer) {
       asphalt: normalTexture(normalFrom(asphaltC, 1.2)),
       brick: normalTexture(normalFrom(brickC, 2.0)),
       water: normalTexture(normalFrom(waterC, 1.4), 4, 4),
+    },
+    roughness: {
+      stucco: normalTexture(roughFrom(stuccoC, 0.88, 0.16)),
+      roof: normalTexture(roughFrom(roofC, 0.82, 0.22)),
+      brick: normalTexture(roughFrom(brickC, 0.9, 0.16)),
+      wood: normalTexture(roughFrom(woodC, 0.78, 0.24)),
+      stone: normalTexture(roughFrom(stoneC, 0.92, 0.12)),
     },
   };
 }

@@ -66,13 +66,14 @@ La APK está firmada con una clave propia que se guarda fuera del repositorio (v
 | Coger / soltar (paneles, EPI, pulsadores) | Gatillo |
 | Moverte | Stick izquierdo |
 | Girar 30° | Stick derecho (izquierda/derecha) |
-| Equiparte el EPI que llevas en la mano | **A / X** (o acércalo a la cara) |
+| Equiparte el EPI que llevas en la mano | **A / X** derecho (o acércalo a la cara) |
+| Saltar | **A / X** izquierdo |
 | Soltar lo que llevas | Gatillo / palma |
 
 ### Controles en pantalla
 
 `WASD` mover · ratón mirar (clic en la escena para capturar el puntero) ·
-clic coger/soltar · `E` equipar el EPI apuntado · `Esc` soltar.
+clic coger/soltar · `E` equipar el EPI apuntado · `Espacio` saltar · `Esc` soltar.
 
 ## Cómo se juega
 
@@ -130,11 +131,14 @@ npm run dev     # esbuild en modo watch + servidor en http://localhost:5173
 npm run build   # genera dist/ listo para publicar
 ```
 
-Sin frameworks: **Three.js** (WebXR), módulos ES y `esbuild`. Todo el arte es procedural,
-así que no hay que descargar modelos ni texturas. Se reutilizan addons oficiales de Three.js
-(`three/addons`): **Sky** (cielo atmosférico y nubes), **ImprovedNoise** (copas de árbol
-orgánicas), **RoundedBoxGeometry** (bordes suaves en paneles y objetos) e **InstancedMesh**
-(follaje y pétalos en un solo draw call por tipo).
+Sin frameworks: **Three.js** (WebXR), módulos ES y `esbuild`. El cielo, las texturas y los
+efectos son procedurales (sin descargas externas). Se reutilizan addons oficiales de
+Three.js (`three/addons`): **Sky** (cielo atmosférico y nubes) y **RoundedBoxGeometry**
+(bordes suaves). Los árboles y arbustos se generan con la librería
+[**EZ-Tree**](https://www.eztree.dev/) (MIT, `@dgreenheck/ez-tree`): ramas y hojas reales con
+mapas PBR y viento en el shader; los cerezos usan una textura de flor propia. Esto añade
+unos 4 MB al bundle (las texturas de la librería van incrustadas), pero funciona sin Internet
+en la APK.
 
 ### APK para Pico 4
 
@@ -196,10 +200,10 @@ src/optimize.js       fusión de malla estática para reducir draw calls
 
 ### Rendimiento
 
-La escena fusiona geometría estática por material (de ~750 a ~410 draw calls con los
-nuevos elementos), usa una sola luz con sombras de 2048 px y limita el pixel ratio. El
-follaje y los pétalos van en `InstancedMesh` para no disparar draw calls por hoja. En Pico 4
-se activa foveación fija (0,65) al entrar en VR.
+La escena fusiona geometría estática por material (~380 draw calls) y usa una sola luz con
+sombras de 2048 px. Los árboles EZ-Tree aportan ~250k triángulos (densidad ajustada para el
+visor); los pétalos van en `InstancedMesh`. En Pico 4 se activa foveación fija (0,65) al
+entrar en VR.
 
 ### Depuración
 

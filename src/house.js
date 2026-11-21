@@ -39,6 +39,7 @@ export function createHouse(textures) {
     map: stuccoMap,
     normalMap: cloneRepeat(textures.normal.stucco, 6, 1.5),
     normalScale: new THREE.Vector2(0.55, 0.55),
+    roughnessMap: cloneRepeat(textures.roughness.stucco, 6, 1.5),
     color: 0xf3ece0,
     roughness: 0.92,
     metalness: 0,
@@ -47,6 +48,7 @@ export function createHouse(textures) {
     map: cloneRepeat(textures.stucco, 2.6, 0.9),
     normalMap: cloneRepeat(textures.normal.stucco, 2.6, 0.9),
     normalScale: new THREE.Vector2(0.55, 0.55),
+    roughnessMap: cloneRepeat(textures.roughness.stucco, 2.6, 0.9),
     color: 0xefe7da,
     roughness: 0.94,
     side: THREE.DoubleSide,
@@ -55,6 +57,7 @@ export function createHouse(textures) {
     map: cloneRepeat(textures.stone, 8, 0.7),
     normalMap: cloneRepeat(textures.normal.stone, 8, 0.7),
     normalScale: new THREE.Vector2(1.15, 1.15),
+    roughnessMap: cloneRepeat(textures.roughness.stone, 8, 0.7),
     color: 0xcfc6b6,
     roughness: 0.95,
   });
@@ -62,6 +65,7 @@ export function createHouse(textures) {
     map: cloneRepeat(textures.roof, 11, 3.2),
     normalMap: cloneRepeat(textures.normal.roof, 11, 3.2),
     normalScale: new THREE.Vector2(1.2, 1.2),
+    roughnessMap: cloneRepeat(textures.roughness.roof, 11, 3.2),
     color: 0xefe0d6,
     roughness: 0.9,
     metalness: 0.02,
@@ -70,6 +74,7 @@ export function createHouse(textures) {
     map: cloneRepeat(textures.roof, 11, 3.2),
     normalMap: cloneRepeat(textures.normal.roof, 11, 3.2),
     normalScale: new THREE.Vector2(1.2, 1.2),
+    roughnessMap: cloneRepeat(textures.roughness.roof, 11, 3.2),
     color: 0xd9c4b8,
     roughness: 0.92,
   });
@@ -77,6 +82,7 @@ export function createHouse(textures) {
     map: cloneRepeat(textures.roof, 12, 0.5),
     normalMap: cloneRepeat(textures.normal.roof, 12, 0.5),
     normalScale: new THREE.Vector2(1, 1),
+    roughnessMap: cloneRepeat(textures.roughness.roof, 12, 0.5),
     color: 0xa8573a,
     roughness: 0.85,
   });
@@ -85,6 +91,7 @@ export function createHouse(textures) {
     map: cloneRepeat(textures.wood, 1.2, 1.2),
     normalMap: cloneRepeat(textures.normal.wood, 1.2, 1.2),
     normalScale: new THREE.Vector2(0.8, 0.8),
+    roughnessMap: cloneRepeat(textures.roughness.wood, 1.2, 1.2),
     color: 0x7c5330,
     roughness: 0.8,
   });
@@ -92,6 +99,7 @@ export function createHouse(textures) {
     map: cloneRepeat(textures.wood, 1, 1.6),
     normalMap: cloneRepeat(textures.normal.wood, 1, 1.6),
     normalScale: new THREE.Vector2(0.7, 0.7),
+    roughnessMap: cloneRepeat(textures.roughness.wood, 1, 1.6),
     color: 0x78917c,
     roughness: 0.8,
   });
@@ -123,6 +131,7 @@ export function createHouse(textures) {
     map: cloneRepeat(textures.brick, 1.1, 2.1),
     normalMap: cloneRepeat(textures.normal.brick, 1.1, 2.1),
     normalScale: new THREE.Vector2(1.1, 1.1),
+    roughnessMap: cloneRepeat(textures.roughness.brick, 1.1, 2.1),
     color: 0xd9c3ae,
     roughness: 0.96,
   });
@@ -138,6 +147,15 @@ export function createHouse(textures) {
   const wallH = HOUSE.eaveY - HOUSE.plinth;
   const walls = box(HOUSE.width, wallH, HOUSE.depth, stuccoMat, 0, HOUSE.plinth + wallH / 2, 0);
   group.add(walls);
+
+  // oclusión ambiental en el encuentro muro-zócalo (sombra de contacto)
+  const aoMat = new THREE.MeshBasicMaterial({
+    color: 0x1a1208,
+    transparent: true,
+    opacity: 0.16,
+    depthWrite: false,
+  });
+  group.add(box(HOUSE.width + 0.02, 0.16, HOUSE.depth + 0.02, aoMat, 0, HOUSE.plinth + 0.08, 0));
 
   // hastiales (triángulos de las fachadas este/oeste)
   const shape = new THREE.Shape();
@@ -221,6 +239,24 @@ export function createHouse(textures) {
       pipe.castShadow = true;
       group.add(pipe);
       group.add(box(0.16, 0.1, 0.16, gutterMat, sx * 5.9, 2.88, s * (HOUSE.depth / 2 + 0.13)));
+    }
+  }
+
+  // testeras de teja: rompen el borde recto del alero
+  const tileEndMat = new THREE.MeshStandardMaterial({
+    map: cloneRepeat(textures.roof, 1, 1),
+    color: 0xc4784f,
+    roughness: 0.88,
+  });
+  for (const s of [1, -1]) {
+    for (let x = -HOUSE.width / 2 - 0.1; x <= HOUSE.width / 2 + 0.1; x += 0.34) {
+      const end = new THREE.Mesh(
+        new THREE.SphereGeometry(0.11, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2),
+        tileEndMat,
+      );
+      end.rotation.x = (Math.PI / 2) * s;
+      end.position.set(x, HOUSE.eaveY - 0.05, s * (HOUSE.depth / 2 + 0.17));
+      group.add(end);
     }
   }
 

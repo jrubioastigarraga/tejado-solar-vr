@@ -8,8 +8,8 @@ import {
   roofYAt,
 } from './config.js';
 import { Sky } from 'three/addons/objects/Sky.js';
-import { ImprovedNoise } from 'three/addons/math/ImprovedNoise.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { Tree, TreePreset } from '@dgreenheck/ez-tree';
 import { cloneRepeat, makeLabelTexture } from './textures.js';
 import { makeScreen } from './screen.js';
 import { mergeStatic } from './optimize.js';
@@ -69,154 +69,80 @@ function makeSky(pagoda = false) {
   return sky;
 }
 
-const _leafNoise = new ImprovedNoise();
-let _leafGeo = null;
-
-/** Geometría de hoja deformada con ruido: una sola para todos los árboles. */
-function leafGeometry() {
-  if (_leafGeo) return _leafGeo;
-  const geo = new THREE.IcosahedronGeometry(1, 1);
-  const pos = geo.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const y = pos.getY(i);
-    const z = pos.getZ(i);
-    const d = 1 + _leafNoise.noise(x * 2.1 + 3, y * 2.1 + 7, z * 2.1 + 11) * 0.17;
-    pos.setXYZ(i, x * d, y * d, z * d);
+let _sakuraTex = null;
+/** Textura de flor de cerezo para los billboards de EZ-Tree. */
+function sakuraTexture() {
+  if (_sakuraTex) return _sakuraTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  for (let i = 0; i < 5; i++) {
+    const a = (i * Math.PI * 2) / 5;
+    g.fillStyle = i % 2 ? '#ffc2d6' : '#ffa6c4';
+    g.beginPath();
+    g.ellipse(64 + Math.cos(a) * 21, 64 + Math.sin(a) * 21, 15, 21, a + Math.PI / 2, 0, Math.PI * 2);
+    g.fill();
   }
-  geo.computeVertexNormals();
-  _leafGeo = geo;
-  return geo;
+  g.fillStyle = '#fff1f6';
+  g.beginPath();
+  g.arc(64, 64, 9, 0, Math.PI * 2);
+  g.fill();
+  _sakuraTex = new THREE.CanvasTexture(c);
+  _sakuraTex.colorSpace = THREE.SRGBColorSpace;
+  return _sakuraTex;
 }
 
+/**
+ * Árboles de la librería EZ-Tree (MIT): ramas y hojas reales con mapas PBR y
+ * viento en el shader. La sombra "de juego" mantiene sus esferas de siempre.
+ */
 function makeTree({ x, z, scale = 1, seed = 1, big = false, palette = null }) {
-  const group = new THREE.Group();
-  const rand = (() => {
-    let a = seed * 9871;
-    return () => {
-      a = (a * 16807) % 2147483647;
-      return a / 2147483647;
-    };
-  })();
-
-  const trunkH = (big ? 4.9 : 3.1) * scale;
-  const trunkMat = new THREE.MeshStandardMaterial({
-    color: palette ? 0x4a3328 : 0x5a4632,
-    roughness: 0.95,
-  });
-  const trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.16 * scale, 0.3 * scale, trunkH, 9),
-    trunkMat,
-  );
-  trunk.position.y = trunkH / 2;
-  trunk.castShadow = true;
-  trunk.receiveShadow = true;
-  group.add(trunk);
-
-  // ramas inclinadas: el tronco deja de ser un simple palo
-  for (let i = 0; i < 4; i++) {
-    const a = rand() * Math.PI * 2;
-    const len = (big ? 2.0 : 1.15) * scale * (0.8 + rand() * 0.45);
-    const branch = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.016 * scale, 0.055 * scale, len, 6),
-      trunkMat,
-    );
-    branch.position.set(
-      Math.cos(a) * len * 0.3,
-      trunkH * (0.6 + rand() * 0.2),
-      Math.sin(a) * len * 0.3,
-    );
-    branch.rotation.z = Math.cos(a) * 0.85;
-    branch.rotation.x = -Math.sin(a) * 0.85;
-    branch.castShadow = true;
-    group.add(branch);
-  }
-
-  // Los cinco primeros grupos son los que proyectan sombra de juego (sin cambios).
-  const blobs = [];
-  if (big) {
-    blobs.push({ x: 0, y: 7.05, z: 0, r: 2.35, shade: true });
-    blobs.push({ x: -1.5, y: 6.15, z: 0.5, r: 1.75, shade: true });
-    blobs.push({ x: 1.35, y: 6.3, z: -0.4, r: 1.65, shade: true });
-    blobs.push({ x: 0.15, y: 5.25, z: 0.9, r: 1.5, shade: true });
-    blobs.push({ x: 0.6, y: 8.0, z: 0.2, r: 1.45, shade: true });
-    for (let i = 0; i < 7; i++) {
-      const a = rand() * Math.PI * 2;
-      const rr = (0.8 + rand() * 1.3) * scale;
-      blobs.push({
-        x: Math.cos(a) * rr,
-        y: (5.4 + rand() * 2.7) * scale,
-        z: Math.sin(a) * rr,
-        r: (0.65 + rand() * 0.5) * scale,
-      });
-    }
-  } else {
-    for (let i = 0; i < 9; i++) {
-      const a = rand() * Math.PI * 2;
-      const rr = (0.35 + rand() * 0.95) * scale;
-      blobs.push({
-        x: Math.cos(a) * rr,
-        y: (3.0 + rand() * 1.9) * scale,
-        z: Math.sin(a) * rr,
-        r: (0.6 + rand() * 0.55) * scale,
-      });
-    }
-  }
-
-  const leafMat = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    roughness: 0.92,
-    flatShading: true,
-  });
-  const foliage = new THREE.InstancedMesh(leafGeometry(), leafMat, blobs.length);
-  const baseColors = palette || [0x4c7d3c, 0x5d8f45, 0x3f6b35];
-  const m = new THREE.Matrix4();
-  const q = new THREE.Quaternion();
-  const e = new THREE.Euler();
-  const v = new THREE.Vector3();
-  const s = new THREE.Vector3();
-  const shadeSpheres = [];
-  blobs.forEach((b, i) => {
-    v.set(b.x, b.y, b.z);
-    e.set(rand() * 0.6, rand() * Math.PI * 2, rand() * 0.6);
-    q.setFromEuler(e);
-    s.set(b.r * (0.9 + rand() * 0.2), b.r * (0.78 + rand() * 0.28), b.r * (0.9 + rand() * 0.2));
-    m.compose(v, q, s);
-    foliage.setMatrixAt(i, m);
-    const c = new THREE.Color(baseColors[i % baseColors.length]);
-    c.offsetHSL((rand() - 0.5) * 0.02, (rand() - 0.5) * 0.08, (rand() - 0.5) * 0.06);
-    foliage.setColorAt(i, c);
-    if (b.shade) {
-      shadeSpheres.push({ center: new THREE.Vector3(x + b.x, b.y, z + b.z), radius: b.r });
-    }
-  });
-  foliage.castShadow = true;
-  foliage.receiveShadow = true;
-  group.add(foliage);
-
-  // flores en los cerezos: una instancia más por árbol, sin coste extra por flor
+  const names = palette
+    ? ['Oak Medium', 'Ash Medium', 'Oak Small']
+    : big
+      ? ['Oak Large']
+      : ['Oak Medium', 'Oak Small', 'Ash Medium'];
+  const tree = new Tree(structuredClone(TreePreset[names[seed % names.length]]));
+  tree.options.seed = seed * 7919 + 13;
+  tree.options.leaves.size = Math.max(tree.options.leaves.size, 2.3);
   if (palette) {
-    const count = 34;
-    const blossoms = new THREE.InstancedMesh(
-      new THREE.IcosahedronGeometry(0.1, 0),
-      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, flatShading: true }),
-      count,
-    );
-    for (let i = 0; i < count; i++) {
-      const b = blobs[i % blobs.length];
-      v.set(b.x + (rand() - 0.5) * b.r * 1.7, b.y + (rand() - 0.5) * b.r * 1.7, b.z + (rand() - 0.5) * b.r * 1.7);
-      q.setFromEuler(e.set(rand() * 3, rand() * 3, rand() * 3));
-      s.setScalar(0.6 + rand() * 0.9);
-      m.compose(v, q, s);
-      blossoms.setMatrixAt(i, m);
-      blossoms.setColorAt(i, new THREE.Color(rand() > 0.45 ? 0xffe6f0 : 0xffffff));
-    }
-    group.add(blossoms);
+    // cerezo: copa densa rosa, corteza más clara
+    tree.options.leaves.type = 'oak';
+    tree.options.leaves.tint = 0xffffff;
+    tree.options.leaves.count = 28;
+    tree.options.leaves.size = 2.5;
+    tree.options.bark.tint = 0x8d7565;
+  }
+  tree.generate();
+  if (palette) {
+    tree.leavesMesh.material.map = sakuraTexture();
+    tree.leavesMesh.material.color.set(0xffffff);
+    tree.leavesMesh.material.alphaTest = 0.4;
+    tree.leavesMesh.material.needsUpdate = true;
   }
 
-  group.position.set(x, 0, z);
-  group.userData.sway = rand() * Math.PI * 2;
-  return { group, shadeSpheres };
+  // los presets vienen en unidades arbitrarias: escalamos a altura de juego
+  const bbox = new THREE.Box3().setFromObject(tree);
+  const height = Math.max(0.001, bbox.max.y - bbox.min.y);
+  const k = ((big ? 7.4 : 4.8) * scale) / height;
+  tree.scale.setScalar(k);
+  tree.position.set(x, -bbox.min.y * k, z);
+  tree.userData.sway = (seed % 7) * 0.9;
+
+  const shadeSpheres = big
+    ? [
+        [0, 7.05, 0, 2.35],
+        [-1.5, 6.15, 0.5, 1.75],
+        [1.35, 6.3, -0.4, 1.65],
+        [0.15, 5.25, 0.9, 1.5],
+        [0.6, 8.0, 0.2, 1.45],
+      ].map(([dx, dy, dz, r]) => ({
+        center: new THREE.Vector3(x + dx * scale, dy * scale, z + dz * scale),
+        radius: r * scale,
+      }))
+    : [];
+
+  return { group: tree, shadeSpheres };
 }
 
 function makeFenceSegment(x1, z1, x2, z2, mat, postMat) {
@@ -914,22 +840,21 @@ export function createWorld({ scene, renderer, textures, house, theme = 'villa' 
   }
 
   if (!pagoda) {
-    const bushMat = new THREE.MeshStandardMaterial({
-      color: 0x537f3a,
-      roughness: 0.95,
-      flatShading: true,
-    });
-    for (let i = 0; i < 9; i++) {
-      const b = new THREE.Mesh(new THREE.IcosahedronGeometry(0.35 + Math.random() * 0.25, 1), bushMat);
-      b.position.set(-11 + Math.random() * 22, 0.25, 7 + Math.random() * 4);
-      if (
-        Math.abs(b.position.x - SITE.bench.x) < 2.6 &&
-        Math.abs(b.position.z - SITE.bench.z) < 2.2
-      )
-        continue;
-      b.castShadow = true;
-      b.receiveShadow = true;
-      group.add(b);
+    for (let i = 0; i < 8; i++) {
+      const bx = -11 + Math.random() * 22;
+      const bz = 7 + Math.random() * 4;
+      if (Math.abs(bx - SITE.bench.x) < 2.6 && Math.abs(bz - SITE.bench.z) < 2.2) continue;
+      const bush = new Tree(structuredClone(TreePreset[i % 3 ? 'Bush 2' : 'Bush 3']));
+      bush.options.seed = 101 + i * 37;
+      bush.options.leaves.count = Math.min(bush.options.leaves.count, 18);
+      bush.generate();
+      const bb = new THREE.Box3().setFromObject(bush);
+      const k = (1.15 + Math.random() * 0.4) / Math.max(0.001, bb.max.y - bb.min.y);
+      bush.scale.setScalar(k);
+      bush.position.set(bx, -bb.min.y * k, bz);
+      bush.userData.sway = i;
+      group.add(bush);
+      trees.push({ group: bush, shadeSpheres: [] });
     }
   }
 
@@ -1484,6 +1409,7 @@ export function createWorld({ scene, renderer, textures, house, theme = 'villa' 
       const sway = t.group.userData.sway || 0;
       t.group.rotation.z = Math.sin(elapsed * 0.7 + sway) * 0.006;
       t.group.rotation.x = Math.cos(elapsed * 0.5 + sway) * 0.004;
+      t.group.update(elapsed); // viento de EZ-Tree
     }
 
     // koi nadando en círculos bajo la superficie

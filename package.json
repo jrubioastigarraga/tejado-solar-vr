@@ -12,6 +12,7 @@
     "deploy": "npm run build && gh-pages -d dist -m \"Publicar en GitHub Pages\""
   },
   "dependencies": {
+    "@dgreenheck/ez-tree": "^1.1.0",
     "three": "0.187.0"
   },
   "devDependencies": {

@@ -46,6 +46,7 @@ export function createPlayer({ renderer, scene }) {
       data: null,
       connected: false,
       aPressed: false,
+      jumpPressed: false,
     };
     controller.addEventListener('connected', (e) => {
       c.data = e.data;
@@ -70,6 +71,8 @@ export function createPlayer({ renderer, scene }) {
     snapCooldown: 0,
     locked: false,
     bounds: 0,
+    jumpY: 0,
+    jumpVel: 0,
   };
 
   const player = {
@@ -111,6 +114,8 @@ export function createPlayer({ renderer, scene }) {
     teleport(x, z, yaw = 0) {
       const h = this.groundHeightAt(x, z);
       state.groundY = h;
+      state.jumpY = 0;
+      state.jumpVel = 0;
       rig.position.set(x, h + (state.xr ? 0 : state.eye), z);
       rig.rotation.y = yaw;
       state.yaw = yaw;
@@ -148,6 +153,14 @@ export function createPlayer({ renderer, scene }) {
           }
           mx = Math.abs(x) > 0.16 ? x : 0;
           my = Math.abs(y) > 0.16 ? y : 0;
+          // botón A/X del mando izquierdo: saltar
+          const jb = gp.buttons?.[4] || gp.buttons?.[5];
+          if (jb?.pressed && !left.jumpPressed) {
+            left.jumpPressed = true;
+            if (state.jumpY <= 0 && state.jumpVel <= 0) state.jumpVel = 4.8;
+          } else if (!jb?.pressed) {
+            left.jumpPressed = false;
+          }
         }
         if (right?.data?.gamepad) {
           const gp = right.data.gamepad;
@@ -224,10 +237,20 @@ export function createPlayer({ renderer, scene }) {
         }
       }
 
+      // gravedad del salto (1:1, como el resto del juego)
+      if (state.jumpY > 0 || state.jumpVel > 0) {
+        state.jumpVel -= 13.5 * dt;
+        state.jumpY += state.jumpVel * dt;
+        if (state.jumpY <= 0) {
+          state.jumpY = 0;
+          state.jumpVel = 0;
+        }
+      }
+
       if (this.state.xr) {
-        rig.position.y += (state.groundY - rig.position.y) * Math.min(1, dt * 14);
+        rig.position.y += (state.groundY + state.jumpY - rig.position.y) * Math.min(1, dt * 14);
       } else {
-        const targetY = state.groundY + state.eye;
+        const targetY = state.groundY + state.eye + state.jumpY;
         rig.position.y += (targetY - rig.position.y) * Math.min(1, dt * 16);
       }
     },
@@ -241,6 +264,11 @@ export function createPlayer({ renderer, scene }) {
     }
     if (e.code === 'KeyE') {
       player.onActivate?.();
+      return;
+    }
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (!e.repeat && state.jumpY <= 0 && state.jumpVel <= 0) state.jumpVel = 4.8;
       return;
     }
     state.keys.add(e.code);
