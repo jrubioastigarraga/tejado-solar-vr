@@ -18,13 +18,14 @@ el entorno:
 
 - **Villa mediterránea** (`?theme=villa`, por defecto): vivienda con cubierta de teja árabe,
   jardín, camino de grava y calle.
-- **Isla de la pagoda** (`?theme=pagoda`): isla flotante con una pagoda de tres cuerpos y
-  tejado *kawara*, paneles solares en su cubierta, cerezos en flor, torii, faroles de piedra,
-  bambú, cascada al vacío y un **lago con peces koi**.
+- **Isla de la pagoda** (`?theme=pagoda`): isla flotante con una pagoda de tres pisos, tejado
+  *kawara* a cuatro aguas con aleros curvos, **paneles solares instalados en la cubierta del
+  piso inferior** (la pagoda ya no "flota" sobre una casa occidental), cerezos en flor con
+  pétalos cayendo, torii, faroles de piedra, bambú, cascada al vacío y un **lago con peces koi**.
 
 La elección se guarda en la URL, así que puedes compartir o marcar cada escena. En la isla,
 las tareas siguen siendo las mismas: el EPI se coge en la mesa, el andamio da acceso a la
-cubierta de la pagoda y el cuadro eléctrico está junto a los paneles.
+cubierta inferior de la pagoda y el cuadro eléctrico está junto a los paneles.
 
 ![Isla de la pagoda](docs/pagoda.jpg)
 
@@ -83,15 +84,20 @@ clic coger/soltar · `E` equipar el EPI apuntado · `Esc` soltar.
    Cuando el marco del panel se pone verde, suelta: queda fijado. Puedes retirar uno ya
    montado cogiéndolo de nuevo. Algunos huecos traen **polvo**: coge el cepillo del andamio
    y frótalo sobre el panel para recuperar su rendimiento.
-4. **Sombra.** El faldón tiene 15 huecos; la chimenea ocupa 2. El árbol del jardín proyecta
+4. **Pausa del café (nuevo reto).** Al fijar el **segundo panel** te retiran el arnés y no
+   puedes seguir en cubierta. Pulsa el **botón rojo** del andamio para bajar, ve a la
+   **máquina de café** (junto a la mesa de EPI), pulsa para pedir, coge la taza y acércala
+   a la boca. Después **recoge el arnés de la mesa, póntelo otra vez y vuelve a subir**: el
+   pulsador verde no te dejará acceder sin él.
+5. **Sombra.** El faldón tiene 15 huecos; la chimenea ocupa 2. El árbol del jardín proyecta
    sombra sobre dos huecos del extremo oeste: producen aproximadamente la mitad. El HUD de
    muñeca muestra la sombra y los kWh/año del hueco que estás apuntando.
-5. **Conexión (fase 3).** Coge el conector rojo de la bobina y llévalo a la toma DC del
+6. **Conexión (fase 3).** Coge el conector rojo de la bobina y llévalo a la toma DC del
    cuadro eléctrico; después conecta el conector verde de **puesta a tierra**. La pantalla
    del inversor indica la conexión parcial.
-6. **Puesta en marcha.** Acciona el **interruptor de corte** del cuadro. El piloto pasa a
+7. **Puesta en marcha.** Acciona el **interruptor de corte** del cuadro. El piloto pasa a
    verde y el LCD muestra la potencia instantánea; sin este paso no se puede certificar.
-7. **Certificación.** Con un mínimo de 8 paneles y el sistema en marcha, pulsa
+8. **Certificación.** Con un mínimo de 8 paneles y el sistema en marcha, pulsa
    **CERTIFICAR** en el cuadro del andamio. Obtienes estrellas, kWp, kWh/año, ahorro y CO₂
    evitado. La nota reparte 25 puntos de seguridad, 30 de montaje, 20 de rendimiento,
    15 de conexión y 10 de remate.
@@ -125,7 +131,10 @@ npm run build   # genera dist/ listo para publicar
 ```
 
 Sin frameworks: **Three.js** (WebXR), módulos ES y `esbuild`. Todo el arte es procedural,
-así que no hay que descargar modelos ni texturas.
+así que no hay que descargar modelos ni texturas. Se reutilizan addons oficiales de Three.js
+(`three/addons`): **Sky** (cielo atmosférico y nubes), **ImprovedNoise** (copas de árbol
+orgánicas), **RoundedBoxGeometry** (bordes suaves en paneles y objetos) e **InstancedMesh**
+(follaje y pétalos en un solo draw call por tipo).
 
 ### APK para Pico 4
 
@@ -172,7 +181,7 @@ segura): sin ellos no podrás firmar actualizaciones que se instalen encima.
 index.html            interfaz de inicio, selector de escena, HUD y resultados
 src/theme.js          escena activa (villa o pagoda) desde la URL
 src/main.js           renderer, arranque, sesión XR y bucle
-src/pagoda.js         pagoda japonesa: tejado kawara, shoji y segundo cuerpo
+src/pagoda.js         pagoda japonesa: tejado kawara a cuatro aguas, aleros curvos, shoji y cuerpos superiores
 src/player.js         rig VR, mandos, locomoción, giro y modo ratón/teclado
 src/house.js          casa, cubierta, guías, ventanas y chimenea
 src/world.js          cielo, sol, terreno, árboles, andamio, EPI y cuadro de obra
@@ -187,9 +196,10 @@ src/optimize.js       fusión de malla estática para reducir draw calls
 
 ### Rendimiento
 
-La escena baja de ~750 a ~290 draw calls fusionando geometría estática por material,
-usa una sola luz con sombras de 2048 px y limita el pixel ratio. En Pico 4 se activa
-foveación fija (0,65) al entrar en VR.
+La escena fusiona geometría estática por material (de ~750 a ~410 draw calls con los
+nuevos elementos), usa una sola luz con sombras de 2048 px y limita el pixel ratio. El
+follaje y los pétalos van en `InstancedMesh` para no disparar draw calls por hoja. En Pico 4
+se activa foveación fija (0,65) al entrar en VR.
 
 ### Depuración
 

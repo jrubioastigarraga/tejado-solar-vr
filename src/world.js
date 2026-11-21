@@ -7,15 +7,32 @@ import {
   roofPoint,
   roofYAt,
 } from './config.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+import { ImprovedNoise } from 'three/addons/math/ImprovedNoise.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { cloneRepeat, makeLabelTexture } from './textures.js';
 import { makeScreen } from './screen.js';
 import { mergeStatic } from './optimize.js';
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
+const _e = new THREE.Euler();
+const _q = new THREE.Quaternion();
+const _s = new THREE.Vector3();
+const _m4 = new THREE.Matrix4();
 
 function box(w, h, d, mat, x = 0, y = 0, z = 0) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  return m;
+}
+
+/** Caja con bordes suaves para los objetos de superficie lisa. */
+function roundedBox(w, h, d, mat, x = 0, y = 0, z = 0, r = 0.035) {
+  const radius = Math.min(r, Math.min(w, h, d) / 2 - 0.001);
+  const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, radius), mat);
   m.position.set(x, y, z);
   m.castShadow = true;
   m.receiveShadow = true;
@@ -29,49 +46,47 @@ function tube(r, len, mat) {
   return m;
 }
 
+/**
+ * Cielo atmosférico del addon oficial de Three.js (modelo de Preetham).
+ * Incluye sol, dispersión y nubes procedurales animadas en un solo draw call,
+ * así que sustituye al shader de degradado y a las nubes por sprites.
+ */
 function makeSky(pagoda = false) {
-  const geo = new THREE.SphereGeometry(420, 40, 24);
-  const mat = new THREE.ShaderMaterial({
-    side: THREE.BackSide,
-    depthWrite: false,
-    fog: false,
-    toneMapped: false,
-    uniforms: {
-      topColor: { value: new THREE.Color(pagoda ? '#37679a' : '#3f7db4') },
-      midColor: { value: new THREE.Color(pagoda ? '#b6d3e6' : '#a9c8dd') },
-      horizonColor: { value: new THREE.Color(pagoda ? '#f4e7e0' : '#e6eef2') },
-      sunColor: { value: new THREE.Color('#fff3d8') },
-      sunDir: { value: SUN_DIR.clone() },
-    },
-    vertexShader: /* glsl */ `
-      varying vec3 vWorld;
-      void main() {
-        vec4 w = modelMatrix * vec4(position, 1.0);
-        vWorld = w.xyz;
-        gl_Position = projectionMatrix * viewMatrix * w;
-      }
-    `,
-    fragmentShader: /* glsl */ `
-      varying vec3 vWorld;
-      uniform vec3 topColor, midColor, horizonColor, sunColor, sunDir;
-      void main() {
-        vec3 d = normalize(vWorld);
-        float h = clamp(d.y, 0.0, 1.0);
-        vec3 col = mix(horizonColor, midColor, smoothstep(0.0, 0.28, h));
-        col = mix(col, topColor, smoothstep(0.2, 0.95, h));
-        float sd = max(dot(d, sunDir), 0.0);
-        col += sunColor * pow(sd, 2200.0) * 2.4;
-        col += sunColor * pow(sd, 40.0) * 0.16;
-        col += sunColor * pow(sd, 5.0) * 0.05;
-        col = mix(col, horizonColor * 0.98, smoothstep(0.1, -0.08, d.y));
-        gl_FragColor = vec4(col, 1.0);
-      }
-    `,
-  });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.frustumCulled = false;
-  mesh.renderOrder = -10;
-  return { mesh, mat };
+  const sky = new Sky();
+  sky.name = 'cielo';
+  sky.scale.setScalar(1000);
+  sky.frustumCulled = false;
+  sky.renderOrder = -10;
+  const u = sky.material.uniforms;
+  u.turbidity.value = pagoda ? 4 : 3.2;
+  u.rayleigh.value = pagoda ? 1.6 : 1.15;
+  u.mieCoefficient.value = pagoda ? 0.006 : 0.005;
+  u.mieDirectionalG.value = 0.8;
+  u.cloudCoverage.value = pagoda ? 0.42 : 0.5;
+  u.cloudDensity.value = 0.55;
+  u.cloudSpeed.value = 0.000022;
+  u.sunPosition.value.copy(SUN_DIR);
+  return sky;
+}
+
+const _leafNoise = new ImprovedNoise();
+let _leafGeo = null;
+
+/** Geometría de hoja deformada con ruido: una sola para todos los árboles. */
+function leafGeometry() {
+  if (_leafGeo) return _leafGeo;
+  const geo = new THREE.IcosahedronGeometry(1, 1);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const d = 1 + _leafNoise.noise(x * 2.1 + 3, y * 2.1 + 7, z * 2.1 + 11) * 0.17;
+    pos.setXYZ(i, x * d, y * d, z * d);
+  }
+  geo.computeVertexNormals();
+  _leafGeo = geo;
+  return geo;
 }
 
 function makeTree({ x, z, scale = 1, seed = 1, big = false, palette = null }) {
@@ -90,7 +105,7 @@ function makeTree({ x, z, scale = 1, seed = 1, big = false, palette = null }) {
     roughness: 0.95,
   });
   const trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.17 * scale, 0.3 * scale, trunkH, 9),
+    new THREE.CylinderGeometry(0.16 * scale, 0.3 * scale, trunkH, 9),
     trunkMat,
   );
   trunk.position.y = trunkH / 2;
@@ -98,10 +113,26 @@ function makeTree({ x, z, scale = 1, seed = 1, big = false, palette = null }) {
   trunk.receiveShadow = true;
   group.add(trunk);
 
-  const leafMats = (palette || [0x4c7d3c, 0x5d8f45, 0x3f6b35]).map(
-    (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, flatShading: true }),
-  );
+  // ramas inclinadas: el tronco deja de ser un simple palo
+  for (let i = 0; i < 4; i++) {
+    const a = rand() * Math.PI * 2;
+    const len = (big ? 2.0 : 1.15) * scale * (0.8 + rand() * 0.45);
+    const branch = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.016 * scale, 0.055 * scale, len, 6),
+      trunkMat,
+    );
+    branch.position.set(
+      Math.cos(a) * len * 0.3,
+      trunkH * (0.6 + rand() * 0.2),
+      Math.sin(a) * len * 0.3,
+    );
+    branch.rotation.z = Math.cos(a) * 0.85;
+    branch.rotation.x = -Math.sin(a) * 0.85;
+    branch.castShadow = true;
+    group.add(branch);
+  }
 
+  // Los cinco primeros grupos son los que proyectan sombra de juego (sin cambios).
   const blobs = [];
   if (big) {
     blobs.push({ x: 0, y: 7.05, z: 0, r: 2.35, shade: true });
@@ -109,31 +140,79 @@ function makeTree({ x, z, scale = 1, seed = 1, big = false, palette = null }) {
     blobs.push({ x: 1.35, y: 6.3, z: -0.4, r: 1.65, shade: true });
     blobs.push({ x: 0.15, y: 5.25, z: 0.9, r: 1.5, shade: true });
     blobs.push({ x: 0.6, y: 8.0, z: 0.2, r: 1.45, shade: true });
-  } else {
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 7; i++) {
+      const a = rand() * Math.PI * 2;
+      const rr = (0.8 + rand() * 1.3) * scale;
       blobs.push({
-        x: (rand() - 0.5) * 1.8 * scale,
-        y: (3.1 + rand() * 1.5) * scale,
-        z: (rand() - 0.5) * 1.8 * scale,
-        r: (1.0 + rand() * 0.55) * scale,
+        x: Math.cos(a) * rr,
+        y: (5.4 + rand() * 2.7) * scale,
+        z: Math.sin(a) * rr,
+        r: (0.65 + rand() * 0.5) * scale,
+      });
+    }
+  } else {
+    for (let i = 0; i < 9; i++) {
+      const a = rand() * Math.PI * 2;
+      const rr = (0.35 + rand() * 0.95) * scale;
+      blobs.push({
+        x: Math.cos(a) * rr,
+        y: (3.0 + rand() * 1.9) * scale,
+        z: Math.sin(a) * rr,
+        r: (0.6 + rand() * 0.55) * scale,
       });
     }
   }
 
+  const leafMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.92,
+    flatShading: true,
+  });
+  const foliage = new THREE.InstancedMesh(leafGeometry(), leafMat, blobs.length);
+  const baseColors = palette || [0x4c7d3c, 0x5d8f45, 0x3f6b35];
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const e = new THREE.Euler();
+  const v = new THREE.Vector3();
+  const s = new THREE.Vector3();
   const shadeSpheres = [];
   blobs.forEach((b, i) => {
-    const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(b.r, 1), leafMats[i % 3]);
-    leaf.position.set(b.x, b.y, b.z);
-    leaf.castShadow = true;
-    leaf.receiveShadow = true;
-    group.add(leaf);
+    v.set(b.x, b.y, b.z);
+    e.set(rand() * 0.6, rand() * Math.PI * 2, rand() * 0.6);
+    q.setFromEuler(e);
+    s.set(b.r * (0.9 + rand() * 0.2), b.r * (0.78 + rand() * 0.28), b.r * (0.9 + rand() * 0.2));
+    m.compose(v, q, s);
+    foliage.setMatrixAt(i, m);
+    const c = new THREE.Color(baseColors[i % baseColors.length]);
+    c.offsetHSL((rand() - 0.5) * 0.02, (rand() - 0.5) * 0.08, (rand() - 0.5) * 0.06);
+    foliage.setColorAt(i, c);
     if (b.shade) {
-      shadeSpheres.push({
-        center: new THREE.Vector3(x + b.x, b.y, z + b.z),
-        radius: b.r,
-      });
+      shadeSpheres.push({ center: new THREE.Vector3(x + b.x, b.y, z + b.z), radius: b.r });
     }
   });
+  foliage.castShadow = true;
+  foliage.receiveShadow = true;
+  group.add(foliage);
+
+  // flores en los cerezos: una instancia más por árbol, sin coste extra por flor
+  if (palette) {
+    const count = 34;
+    const blossoms = new THREE.InstancedMesh(
+      new THREE.IcosahedronGeometry(0.1, 0),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, flatShading: true }),
+      count,
+    );
+    for (let i = 0; i < count; i++) {
+      const b = blobs[i % blobs.length];
+      v.set(b.x + (rand() - 0.5) * b.r * 1.7, b.y + (rand() - 0.5) * b.r * 1.7, b.z + (rand() - 0.5) * b.r * 1.7);
+      q.setFromEuler(e.set(rand() * 3, rand() * 3, rand() * 3));
+      s.setScalar(0.6 + rand() * 0.9);
+      m.compose(v, q, s);
+      blossoms.setMatrixAt(i, m);
+      blossoms.setColorAt(i, new THREE.Color(rand() > 0.45 ? 0xffe6f0 : 0xffffff));
+    }
+    group.add(blossoms);
+  }
 
   group.position.set(x, 0, z);
   group.userData.sway = rand() * Math.PI * 2;
@@ -295,25 +374,29 @@ function makeBamboo(seed = 1, count = 7) {
 export function createWorld({ scene, renderer, textures, house, theme = 'villa' }) {
   const pagoda = theme === 'pagoda';
   const fish = [];
+  let petals = null;
+  let lakeWaterMat = null;
   const group = new THREE.Group();
   group.name = 'entorno';
   scene.add(group);
 
   /* ------------------------------------------------------------------ cielo */
   const sky = makeSky(pagoda);
-  scene.add(sky.mesh);
+  scene.add(sky);
 
   const envScene = new THREE.Scene();
-  const envSphere = new THREE.Mesh(new THREE.SphereGeometry(30, 24, 12), sky.mat);
+  const envSphere = new THREE.Mesh(new THREE.SphereGeometry(30, 24, 12), sky.material);
   envScene.add(envSphere);
+  sky.material.uniforms.showSunDisc.value = 0;
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envRT = pmrem.fromScene(envScene, 0.04, 0.1, 100);
+  sky.material.uniforms.showSunDisc.value = 1;
   scene.environment = envRT.texture;
   scene.environmentIntensity = 0.55;
   pmrem.dispose();
 
   /* ------------------------------------------------------------------- luz */
-  const sun = new THREE.DirectionalLight(0xfff1da, 3.2);
+  const sun = new THREE.DirectionalLight(0xfff1da, 4.8);
   sun.position.copy(SUN_DIR).multiplyScalar(38);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -328,10 +411,10 @@ export function createWorld({ scene, renderer, textures, house, theme = 'villa' 
   sun.target.position.set(0, 1, 0);
   group.add(sun, sun.target);
 
-  const hemi = new THREE.HemisphereLight(0xd7e7ff, 0x5d6b46, 0.65);
+  const hemi = new THREE.HemisphereLight(0xd7e7ff, 0x5d6b46, 0.95);
   group.add(hemi);
 
-  const fill = new THREE.DirectionalLight(0xbcd4ee, 0.45);
+  const fill = new THREE.DirectionalLight(0xbcd4ee, 0.68);
   fill.position.set(6, 14, -12);
   group.add(fill);
 
@@ -537,19 +620,19 @@ export function createWorld({ scene, renderer, textures, house, theme = 'villa' 
     bed.position.set(lakeX, 0.004, lakeZ);
     deco.add(bed);
 
-    const lakeWater = new THREE.Mesh(
-      new THREE.CircleGeometry(lakeR, 48),
-      new THREE.MeshStandardMaterial({
-        color: 0x3d8fa0,
-        transparent: true,
-        opacity: 0.52,
-        roughness: 0.08,
-        metalness: 0.35,
-        emissive: 0x0b2a30,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      }),
-    );
+    lakeWaterMat = new THREE.MeshStandardMaterial({
+      color: 0x3d8fa0,
+      transparent: true,
+      opacity: 0.52,
+      roughness: 0.08,
+      metalness: 0.35,
+      emissive: 0x0b2a30,
+      normalMap: cloneRepeat(textures.normal.water, 4, 4),
+      normalScale: new THREE.Vector2(0.42, 0.42),
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const lakeWater = new THREE.Mesh(new THREE.CircleGeometry(lakeR, 48), lakeWaterMat);
     lakeWater.rotation.x = -Math.PI / 2;
     lakeWater.position.set(lakeX, 0.05, lakeZ);
     lakeWater.renderOrder = 2;
@@ -650,6 +733,37 @@ export function createWorld({ scene, renderer, textures, house, theme = 'villa' 
         y: 0.008 + Math.random() * 0.025,
       });
     }
+
+    // pétalos de cerezo: caen y giran lentamente sobre la isla
+    const petalCount = 170;
+    petals = new THREE.InstancedMesh(
+      new THREE.PlaneGeometry(0.15, 0.1),
+      new THREE.MeshBasicMaterial({
+        color: 0xffc1d6,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.92,
+        toneMapped: false,
+      }),
+      petalCount,
+    );
+    petals.name = 'sakura';
+    petals.frustumCulled = false;
+    petals.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    const petalData = [];
+    for (let i = 0; i < petalCount; i++) {
+      petalData.push({
+        x: (Math.random() - 0.5) * 38,
+        y: Math.random() * 15 + 1,
+        z: (Math.random() - 0.5) * 38,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.45 + Math.random() * 0.7,
+        spin: (Math.random() - 0.5) * 2.4,
+        scale: 0.7 + Math.random() * 0.8,
+      });
+    }
+    petals.userData.data = petalData;
+    group.add(petals);
 
     group.add(deco);
     mergeStatic(deco);
@@ -877,47 +991,6 @@ export function createWorld({ scene, renderer, textures, house, theme = 'villa' 
       group.add(h);
     }
   }
-  const cloudCanvas = document.createElement('canvas');
-  cloudCanvas.width = 256;
-  cloudCanvas.height = 128;
-  const cg = cloudCanvas.getContext('2d');
-  const cr = (() => {
-    let s = 99;
-    return () => {
-      s = (s * 16807) % 2147483647;
-      return s / 2147483647;
-    };
-  })();
-  for (let i = 0; i < 16; i++) {
-    const x = 30 + cr() * 196;
-    const y = 45 + cr() * 50;
-    const rad = 16 + cr() * 34;
-    const grd = cg.createRadialGradient(x, y, 0, x, y, rad);
-    grd.addColorStop(0, 'rgba(255,255,255,0.55)');
-    grd.addColorStop(1, 'rgba(255,255,255,0)');
-    cg.fillStyle = grd;
-    cg.fillRect(x - rad, y - rad, rad * 2, rad * 2);
-  }
-  const cloudTex = new THREE.CanvasTexture(cloudCanvas);
-  cloudTex.colorSpace = THREE.SRGBColorSpace;
-  for (let i = 0; i < 7; i++) {
-    const a = i * 1.35 + 0.5;
-    const r = 150 + randH() * 120;
-    const sp = new THREE.Sprite(
-      new THREE.SpriteMaterial({
-        map: cloudTex,
-        transparent: true,
-        opacity: 0.5,
-        depthWrite: false,
-        toneMapped: false,
-        fog: false,
-      }),
-    );
-    sp.position.set(Math.sin(a) * r, 52 + randH() * 38, Math.cos(a) * r);
-    sp.scale.set(80 + randH() * 60, 30 + randH() * 20, 1);
-    group.add(sp);
-  }
-
   /* --------------------------------------------------------------- andamio */
   const scaffold = new THREE.Group();
   const metal = new THREE.MeshStandardMaterial({
@@ -1031,7 +1104,7 @@ export function createWorld({ scene, renderer, textures, house, theme = 'villa' 
   /* ----------------------------------------------------------- pulsador subir */
   const accessPedestal = new THREE.Group();
   const pedMat = new THREE.MeshStandardMaterial({ color: 0x25313d, roughness: 0.55, metalness: 0.35 });
-  const pedestal = box(0.42, 1.1, 0.26, pedMat, 0, 0.55, 0);
+  const pedestal = roundedBox(0.42, 1.1, 0.26, pedMat, 0, 0.55, 0, 0.045);
   accessPedestal.add(pedestal);
   const accessButton = new THREE.Mesh(
     new THREE.CylinderGeometry(0.115, 0.115, 0.06, 22),
@@ -1071,6 +1144,43 @@ export function createWorld({ scene, renderer, textures, house, theme = 'villa' 
   accessPedestal.position.set(ladderX + 0.75, 0, 7.35);
   accessPedestal.rotation.y = -0.25;
   group.add(accessPedestal);
+
+  /* -------------------------------------------------------- pulsador bajar */
+  const descendPedestal = new THREE.Group();
+  descendPedestal.add(roundedBox(0.3, 0.88, 0.22, pedMat, 0, 0.44, 0, 0.035));
+  const descendButton = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.072, 0.072, 0.045, 20),
+    new THREE.MeshStandardMaterial({
+      color: 0x8e2f28,
+      emissive: 0xff5b48,
+      emissiveIntensity: 1.0,
+      roughness: 0.38,
+      metalness: 0.2,
+    }),
+  );
+  descendButton.rotation.x = Math.PI / 2;
+  descendButton.position.set(0, 0.74, -0.13);
+  descendButton.castShadow = true;
+  descendButton.userData.kind = 'button';
+  descendPedestal.add(descendButton);
+  const descendLabel = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.5, 0.22),
+    new THREE.MeshBasicMaterial({
+      map: makeLabelTexture(
+        [
+          { text: 'BAJAR', size: 40, color: '#ffb0a0' },
+          { text: 'pulsa para bajar', size: 23, color: '#dbe8f5' },
+        ],
+        { bg: 'rgba(60,16,16,0.92)', border: 'rgba(255,120,100,0.7)' },
+      ),
+      transparent: true,
+      toneMapped: false,
+    }),
+  );
+  descendLabel.position.set(0, 1.03, -0.12);
+  descendPedestal.add(descendLabel);
+  descendPedestal.position.set(SITE.platform.x0 + 0.7, deckY, SITE.platform.z1 - 0.5);
+  group.add(descendPedestal);
 
   /* ------------------------------------------------------------- mesa de EPI */
   const benchGroup = new THREE.Group();
@@ -1132,6 +1242,84 @@ export function createWorld({ scene, renderer, textures, house, theme = 'villa' 
   benchGroup.rotation.y = SITE.bench.rotY;
   mergeStatic(benchGroup);
   group.add(benchGroup);
+
+  /* ------------------------------------------------------- máquina de café */
+  const coffeeGroup = new THREE.Group();
+  const coffeeBodyMat = new THREE.MeshStandardMaterial({
+    color: 0x2a323a,
+    roughness: 0.48,
+    metalness: 0.35,
+  });
+  const coffeeTrimMat = new THREE.MeshStandardMaterial({
+    color: 0xb9c2c9,
+    roughness: 0.3,
+    metalness: 0.85,
+  });
+  coffeeGroup.add(roundedBox(0.92, 0.07, 0.62, benchTopMat, 0, 0.79, 0, 0.02));
+  for (const sx of [-0.38, 0.38]) {
+    for (const sz of [-0.23, 0.23]) {
+      coffeeGroup.add(box(0.06, 0.78, 0.06, metal, sx, 0.39, sz));
+    }
+  }
+  coffeeGroup.add(roundedBox(0.6, 0.66, 0.46, coffeeBodyMat, 0, 1.16, 0, 0.06));
+  coffeeGroup.add(
+    box(0.5, 0.3, 0.03, new THREE.MeshStandardMaterial({ color: 0x0d1620, roughness: 0.25 }), 0, 1.22, 0.24),
+  );
+  coffeeGroup.add(box(0.34, 0.02, 0.18, coffeeTrimMat, 0, 0.87, 0.18));
+  coffeeGroup.add(box(0.3, 0.02, 0.24, coffeeTrimMat, 0, 0.87, 0.33));
+  coffeeGroup.add(box(0.06, 0.1, 0.06, coffeeTrimMat, 0, 0.99, 0.16));
+  const coffeeButton = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.065, 0.065, 0.04, 20),
+    new THREE.MeshStandardMaterial({
+      color: 0x1f6b45,
+      emissive: 0x24c07a,
+      emissiveIntensity: 1.0,
+      roughness: 0.4,
+    }),
+  );
+  coffeeButton.rotation.x = Math.PI / 2;
+  coffeeButton.position.set(0.17, 1.22, 0.26);
+  coffeeButton.castShadow = true;
+  coffeeButton.userData.kind = 'button';
+  coffeeGroup.add(coffeeButton);
+
+  const coffeeCup = new THREE.Group();
+  const cupMat = new THREE.MeshStandardMaterial({ color: 0xf7f3ec, roughness: 0.42 });
+  coffeeCup.add(new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.04, 0.1, 16), cupMat));
+  const coffeeSurface = new THREE.Mesh(
+    new THREE.CircleGeometry(0.049, 16),
+    new THREE.MeshStandardMaterial({ color: 0x4a2c18, roughness: 0.35 }),
+  );
+  coffeeSurface.rotation.x = -Math.PI / 2;
+  coffeeSurface.position.y = 0.052;
+  coffeeCup.add(coffeeSurface);
+  const cupHandle = new THREE.Mesh(new THREE.TorusGeometry(0.028, 0.008, 6, 12, Math.PI * 1.3), cupMat);
+  cupHandle.position.x = 0.06;
+  cupHandle.rotation.y = Math.PI / 2;
+  coffeeCup.add(cupHandle);
+  coffeeCup.position.set(-0.02, 0.95, 0.34);
+  coffeeCup.visible = false;
+  coffeeGroup.add(coffeeCup);
+
+  const coffeeSign = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.74, 0.3),
+    new THREE.MeshBasicMaterial({
+      map: makeLabelTexture(
+        [
+          { text: 'MÁQUINA DE CAFÉ', size: 32, color: '#ffc247' },
+          { text: 'pulsa para pedir', size: 24, color: '#dce8f4' },
+        ],
+        { bg: 'rgba(8,14,22,0.92)', border: 'rgba(255,194,71,0.6)' },
+      ),
+      transparent: true,
+      toneMapped: false,
+    }),
+  );
+  coffeeSign.position.set(0, 1.66, 0);
+  coffeeGroup.add(coffeeSign);
+  coffeeGroup.position.set(7.15, 0, 7.1);
+  coffeeGroup.rotation.y = -0.7;
+  group.add(coffeeGroup);
 
   /* --------------------------------------------------------- cartel de obra */
   const boardPos = new THREE.Vector3(-3.42, 4.16, 5.28);
@@ -1286,6 +1474,12 @@ export function createWorld({ scene, renderer, textures, house, theme = 'villa' 
   }
 
   function update(dt, elapsed) {
+    // nubes procedurales del addon Sky y ondas del lago
+    sky.material.uniforms.time.value = elapsed;
+    if (lakeWaterMat) {
+      lakeWaterMat.normalMap.offset.x += dt * 0.018;
+      lakeWaterMat.normalMap.offset.y += dt * 0.011;
+    }
     for (const t of trees) {
       const sway = t.group.userData.sway || 0;
       t.group.rotation.z = Math.sin(elapsed * 0.7 + sway) * 0.006;
@@ -1301,6 +1495,30 @@ export function createWorld({ scene, renderer, textures, house, theme = 'villa' 
         f.cz + Math.sin(a) * f.r,
       );
       f.mesh.rotation.y = Math.atan2(-Math.cos(a) * f.dir, -Math.sin(a) * f.dir);
+    }
+
+    // pétalos de sakura
+    if (petals) {
+      const data = petals.userData.data;
+      for (let i = 0; i < data.length; i++) {
+        const p = data[i];
+        p.y -= p.speed * dt;
+        if (p.y < 0.08) {
+          p.y = 13 + Math.random() * 4;
+          p.x = (Math.random() - 0.5) * 38;
+          p.z = (Math.random() - 0.5) * 38;
+        }
+        _v.set(
+          p.x + Math.sin(elapsed * 1.3 + p.phase) * 0.38,
+          p.y,
+          p.z + Math.cos(elapsed * 0.9 + p.phase) * 0.26,
+        );
+        _q.setFromEuler(_e.set(p.phase + elapsed * p.spin, elapsed * p.spin * 0.6, p.phase));
+        _s.setScalar(p.scale);
+        _m4.compose(_v, _q, _s);
+        petals.setMatrixAt(i, _m4);
+      }
+      petals.instanceMatrix.needsUpdate = true;
     }
   }
 
@@ -1342,6 +1560,11 @@ export function createWorld({ scene, renderer, textures, house, theme = 'villa' 
     update,
     accessButton,
     accessPedestal,
+    descendButton,
+    descendPedestal,
+    coffeeButton,
+    coffeeCup,
+    coffeeGroup,
     finishButton,
     finishConsole: consoleGroup,
     deckY,

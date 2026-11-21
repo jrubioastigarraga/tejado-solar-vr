@@ -215,6 +215,12 @@ export function createInteractions({ renderer, scene, camera, player }) {
     }
   }
 
+  function releaseHeld(root) {
+    for (const p of pointers) {
+      if (p.held?.root === root) release(p);
+    }
+  }
+
   function releaseAll() {
     for (const p of pointers) release(p);
     for (const p of pointers) setHover(p, null);
@@ -230,6 +236,7 @@ export function createInteractions({ renderer, scene, camera, player }) {
     registerButton,
     update,
     releaseAll,
+    releaseHeld,
     hovered,
     debugPick,
     desktop,

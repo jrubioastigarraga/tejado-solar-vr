@@ -793,6 +793,29 @@ function drawBrick() {
   return c;
 }
 
+/** Mapa de altura de ondas suaves: se convierte en normal para el agua del lago. */
+function drawWater() {
+  const c = canvas(256, 256);
+  const g = c.getContext('2d');
+  const img = g.createImageData(256, 256);
+  for (let y = 0; y < 256; y++) {
+    for (let x = 0; x < 256; x++) {
+      const v =
+        128 +
+        34 * Math.sin(x * 0.085 + Math.sin(y * 0.045) * 2.2) +
+        24 * Math.sin(y * 0.12) +
+        16 * Math.sin((x + y) * 0.17);
+      const i = (y * 256 + x) * 4;
+      img.data[i] = v;
+      img.data[i + 1] = v;
+      img.data[i + 2] = v;
+      img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return c;
+}
+
 export function buildTextures(renderer) {
   ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
@@ -809,6 +832,7 @@ export function buildTextures(renderer) {
   const asphaltC = drawAsphalt();
   const brickC = drawBrick();
   const dustC = drawDust();
+  const waterC = drawWater();
 
   return {
     roof: texture(roofC),
@@ -835,6 +859,7 @@ export function buildTextures(renderer) {
       metal: normalTexture(normalFrom(metalC, 0.5)),
       asphalt: normalTexture(normalFrom(asphaltC, 1.2)),
       brick: normalTexture(normalFrom(brickC, 2.0)),
+      water: normalTexture(normalFrom(waterC, 1.4), 4, 4),
     },
   };
 }

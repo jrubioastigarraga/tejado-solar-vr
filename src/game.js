@@ -17,6 +17,7 @@ export function createGame({
     started: false,
     xr: false,
     welcomeShown: false,
+    coffee: { triggered: false, ordered: false, done: false },
   };
 
   window.__sfx = audio;
@@ -77,6 +78,10 @@ export function createGame({
       name: 'FASE 2 · MONTAJE',
       objective: 'Coge un panel del stock y acércalo a una guía del faldón sur. Suelta cuando se ponga verde.',
     },
+    coffee: {
+      name: 'DESCANSO · CAFÉ',
+      objective: 'Se te ha retirado el arnés. Baja por la escalera y pide un café en la máquina, junto a la mesa de EPI.',
+    },
     connection: {
       name: 'FASE 3 · CONEXIÓN',
       objective: 'Conecta el cable DC y la puesta a tierra en el cuadro eléctrico del andamio.',
@@ -130,6 +135,83 @@ export function createGame({
     hud.toast('Montaje suficiente. Ahora conecta y pon en marcha la instalación.', 'ok');
   }
 
+  /* -------------------------------------------------- pausa del café (reto) */
+  function startCoffeeBreak() {
+    if (state.coffee.triggered) return;
+    state.coffee.triggered = true;
+    state.phase = 'coffee';
+    lastObjective = '';
+    ppe.unequip('harness');
+    refreshAll();
+    audio.error();
+    hud.showModal({
+      title: 'HORA DEL CAFÉ',
+      subtitle: 'Descanso obligatorio tras los dos primeros paneles',
+      lines: [
+        { text: 'Te has quitado el arnés: no puedes seguir en cubierta sin él.', color: '#ffb3b3' },
+        { text: 'Pulsa el botón rojo para bajar por la escalera.', color: '#ffe7b3' },
+        { text: 'Ve a la máquina de café, junto a la mesa de EPI, y pide un café.', color: '#c9d8e8' },
+      ],
+      button: 'ENTENDIDO',
+    });
+  }
+
+  function onPanelPlaced() {
+    if (state.coffee.triggered || state.phase === 'coffee') return;
+    if (solar.state.placed >= 2) startCoffeeBreak();
+  }
+
+  function descend() {
+    if (!player.onRoof()) {
+      hud.toast('Ya estás en la zona de descanso.', '');
+      return;
+    }
+    player.teleport(6.3, 8.1, -0.7);
+    hud.toast('Has bajado. La máquina de café está justo delante de ti.', '');
+    audio.pick();
+    refreshAll();
+  }
+
+  function orderCoffee() {
+    if (state.phase !== 'coffee') {
+      hud.toast('Ahora mismo no toca café. El descanso llega al colocar el segundo panel.', '');
+      return;
+    }
+    if (state.coffee.ordered) {
+      hud.toast('Ya has pedido el café: coge la taza y llévala a la boca.', '');
+      return;
+    }
+    state.coffee.ordered = true;
+    world.coffeeCup.visible = true;
+    hud.toast('Café servido. Coge la taza y acércala a la boca para beberlo.', 'ok');
+    audio.success();
+    refreshAll();
+  }
+
+  function drinkCoffee() {
+    if (state.coffee.done) return;
+    state.coffee.done = true;
+    const cup = world.coffeeCup;
+    cup.userData.drunk = true;
+    cup.visible = false;
+    interactions.releaseHeld(cup);
+    if (cup.parent) scene.attach(cup);
+    state.phase = 'install';
+    lastObjective = '';
+    refreshAll();
+    audio.success();
+    hud.showModal({
+      title: 'CAFÉ SERVIDO',
+      subtitle: 'Descanso completado',
+      lines: [
+        { text: 'Recoge el arnés de la mesa de EPI y ponételo otra vez.', color: '#ffe7b3' },
+        { text: 'Sin arnés el pulsador verde no te dejará subir a cubierta.', color: '#c9d8e8' },
+      ],
+      button: 'SEGUIR TRABAJANDO',
+    });
+    hud.toast('Descanso terminado: ponte el arnés y vuelve a subir.', 'ok');
+  }
+
   let lastObjective = '';
   function updateObjective() {
     let objective = phaseInfo[state.phase].objective;
@@ -138,7 +220,9 @@ export function createGame({
         objective = 'EPI completo. Pulsa el pulsador verde junto a la escalera para subir a cubierta.';
       }
     } else if (state.phase === 'install') {
-      if (solar.state.placed >= solar.validSlots) {
+      if (state.coffee.triggered && !ppe.equipped.harness) {
+        objective = 'Descanso terminado: recoge el arnés de la mesa de EPI, póntelo y pulsa el pulsador verde para subir.';
+      } else if (solar.state.placed >= solar.validSlots) {
         objective = 'Todos los huecos útiles cubiertos. Prepara la conexión eléctrica.';
       } else if (solar.state.placed >= ENERGY.minPanels) {
         objective = 'Mínimo alcanzado. Puedes seguir montando o pasar a la conexión.';
@@ -239,6 +323,52 @@ export function createGame({
   );
 
   interactions.registerButton(
+    world.descendPedestal,
+    () => descend(),
+    { maxDistance: 3.6, hoverScale: 1 },
+  );
+
+  interactions.registerButton(
+    world.coffeeGroup,
+    () => orderCoffee(),
+    { maxDistance: 3.2, hoverScale: 1 },
+  );
+
+  world.coffeeGroup.updateWorldMatrix(true, true);
+  const cupHome = world.coffeeGroup.localToWorld(new THREE.Vector3(-0.02, 0.95, 0.34));
+  interactions.registerGrab(world.coffeeCup, {
+    type: 'coffee',
+    maxDistance: 2.9,
+    hoverScale: 1.12,
+    enabled: () => state.coffee.ordered && !state.coffee.done,
+    onGrab: (root, holder) => {
+      root.userData.state = 'held';
+      holder.attach(root);
+      root.position.set(0, -0.05, -0.18);
+      root.quaternion.identity();
+      root.scale.setScalar(1);
+      audio.pick();
+      hud.toast('Taza en mano: acércala a la boca para beber el café.', '');
+      return true;
+    },
+    onRelease: (root) => {
+      if (root.userData.drunk || state.coffee.done) return;
+      root.getWorldPosition(_panelPos);
+      player.camera.getWorldPosition(_brushPos);
+      if (_panelPos.distanceTo(_brushPos) < 0.45) {
+        drinkCoffee();
+        return;
+      }
+      scene.attach(root);
+      root.position.copy(cupHome);
+      root.quaternion.identity();
+      root.scale.setScalar(1);
+      root.userData.state = 'dispensed';
+      hud.toast('Acerca la taza a la boca para beber el café.', '');
+    },
+  });
+
+  interactions.registerButton(
     world.finishConsole,
     () => finish(),
     { maxDistance: 4.0, hoverScale: 1 },
@@ -261,6 +391,11 @@ export function createGame({
 
   /* --------------------------------------------------------------- acciones */
   function accessRoof() {
+    if (state.phase === 'coffee') {
+      hud.toast('Estás de descanso: baja, pide el café y vuelve a ponerte el arnés.', 'err');
+      audio.error();
+      return;
+    }
     if (!ppe.isComplete()) {
       hud.toast('Primero completa el EPI: casco, gafas, guantes y arnés.', 'err');
       audio.error();
@@ -381,6 +516,15 @@ export function createGame({
     solar.reset();
     ppe.reset();
     electrical.reset();
+    state.coffee = { triggered: false, ordered: false, done: false };
+    const cup = world.coffeeCup;
+    cup.userData.drunk = false;
+    cup.userData.state = 'dispensed';
+    cup.visible = false;
+    if (cup.parent !== world.coffeeGroup) world.coffeeGroup.attach(cup);
+    cup.position.set(-0.02, 0.95, 0.34);
+    cup.quaternion.identity();
+    cup.scale.setScalar(1);
     brush.userData.state = 'free';
     scene.attach(brush);
     brush.position.copy(brush.userData.basePos);
@@ -442,8 +586,18 @@ export function createGame({
     update: (dt) => {
       updateLifeline();
       updateCleaning(dt);
+      const cup = world.coffeeCup;
+      if (cup.userData.state === 'held' && !state.coffee.done) {
+        cup.getWorldPosition(_panelPos);
+        player.camera.getWorldPosition(_brushPos);
+        if (_panelPos.distanceTo(_brushPos) < 0.36) drinkCoffee();
+      }
     },
     accessRoof,
+    onPanelPlaced,
+    descend,
+    orderCoffee,
+    drinkCoffee,
     finish,
     reset,
     computeResult,

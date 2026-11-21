@@ -100,6 +100,19 @@ export function createPagoda(textures) {
     metalness: 0.8,
     roughness: 0.34,
   });
+  // remates y aleros: teja vidriada oscura con reflejo metálico
+  const eaveMat = new THREE.MeshStandardMaterial({
+    map: cloneRepeat(textures.kawara, 14, 0.6),
+    normalMap: cloneRepeat(textures.normal.kawara, 14, 0.6),
+    color: 0x76848f,
+    roughness: 0.55,
+    metalness: 0.22,
+  });
+  const brassMat = new THREE.MeshStandardMaterial({
+    color: 0xc7a24c,
+    metalness: 0.85,
+    roughness: 0.3,
+  });
 
   /* --------------------------------------------------------------- basamento */
   const plinth = box(
@@ -135,58 +148,76 @@ export function createPagoda(textures) {
   }
   for (const y of [HOUSE.plinth + 0.06, HOUSE.eaveY - 0.16]) {
     for (const z of [-HOUSE.depth / 2 - 0.02, HOUSE.depth / 2 + 0.02]) {
-      group.add(box(HOUSE.width + 0.06, 0.16, 0.14, darkWoodMat, 0, y, z));
+      group.add(box(HOUSE.width + 0.06, 0.16, 0.14, lacquerMat, 0, y, z));
     }
     for (const x of [-HOUSE.width / 2 - 0.02, HOUSE.width / 2 + 0.02]) {
-      group.add(box(0.14, 0.16, HOUSE.depth + 0.06, darkWoodMat, x, y, 0));
+      group.add(box(0.14, 0.16, HOUSE.depth + 0.06, lacquerMat, x, y, 0));
     }
   }
+  // friso decorativo bajo el alero
+  for (const z of [-HOUSE.depth / 2 - 0.03, HOUSE.depth / 2 + 0.03]) {
+    group.add(box(HOUSE.width + 0.12, 0.07, 0.1, goldMat, 0, HOUSE.eaveY - 0.36, z));
+  }
 
-  // hastiales de madera
-  const shape = new THREE.Shape();
-  shape.moveTo(-ROOF.halfDepth, 0);
-  shape.lineTo(ROOF.halfDepth, 0);
-  shape.lineTo(0, HOUSE.rise);
-  shape.closePath();
-  const gableGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.3, bevelEnabled: false });
-  gableGeo.rotateY(-Math.PI / 2);
-  const gableR = new THREE.Mesh(gableGeo, darkWoodMat);
-  gableR.position.set(HOUSE.width / 2 - 0.15, HOUSE.eaveY, 0);
-  gableR.castShadow = true;
-  gableR.receiveShadow = true;
-  const gableL = gableR.clone();
-  gableL.position.x = -HOUSE.width / 2 + 0.15;
-  gableL.scale.x = -1;
-  group.add(gableR, gableL);
-
-  // hastiales decorados: plaster blanco, viga central y remate dorado
+  /* -------------------------------------------------- cubierta a cuatro aguas
+     Sustituye los hastiales occidentales: el tejado de la pagoda cierra también
+     por los lados y levanta las esquinas. La cara sur sigue siendo el plano
+     jugable exacto donde se anclan las guías y los paneles. */
+  const eaveOverhang = ROOF.overhangX + 0.45;
+  const hipX = HOUSE.width / 2 + eaveOverhang;
+  const hipZ = HOUSE.depth / 2 + 0.42;
   for (const sx of [-1, 1]) {
-    const shape2 = new THREE.Shape();
-    shape2.moveTo(-ROOF.halfDepth * 0.72, 0.18);
-    shape2.lineTo(ROOF.halfDepth * 0.72, 0.18);
-    shape2.lineTo(0, HOUSE.rise * 0.76);
-    shape2.closePath();
-    const panel = new THREE.Mesh(new THREE.ShapeGeometry(shape2), plasterMat);
-    panel.rotation.y = (sx * Math.PI) / 2;
-    panel.position.set(sx * (HOUSE.width / 2 + 0.02), HOUSE.eaveY + 0.12, 0);
-    panel.castShadow = true;
-    group.add(panel);
+    const shape = new THREE.Shape();
+    shape.moveTo(-hipZ, HOUSE.eaveY - 0.04);
+    shape.lineTo(hipZ, HOUSE.eaveY - 0.04);
+    shape.lineTo(0, ROOF.ridgeY + 0.02);
+    shape.closePath();
+    const geo = new THREE.ShapeGeometry(shape);
+    geo.rotateY((sx * Math.PI) / 2);
+    const mat = kawaraMat.clone();
+    mat.side = THREE.DoubleSide;
+    mat.map = cloneRepeat(textures.kawara, 3, 3);
+    mat.normalMap = cloneRepeat(textures.normal.kawara, 3, 3);
+    const hip = new THREE.Mesh(geo, mat);
+    hip.position.x = sx * hipX;
+    hip.castShadow = true;
+    hip.receiveShadow = true;
+    group.add(hip);
 
-    const beam = box(0.07, HOUSE.rise * 0.72, 0.08, darkWoodMat, sx * (HOUSE.width / 2 + 0.05), HOUSE.eaveY + HOUSE.rise * 0.4, 0);
-    group.add(beam);
-    const medallion = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.035, 8, 20), goldMat);
-    medallion.rotation.y = (sx * Math.PI) / 2;
-    medallion.position.set(sx * (HOUSE.width / 2 + 0.08), HOUSE.eaveY + HOUSE.rise * 0.42, 0);
-    group.add(medallion);
-  }
-
-  // canecillos bajo el alero principal
-  for (const z of [HOUSE.depth / 2 + 0.14, -HOUSE.depth / 2 - 0.14]) {
-    for (let x = -5.5; x <= 5.5; x += 1.1) {
-      group.add(box(0.14, 0.2, 0.4, darkWoodMat, x, HOUSE.eaveY - 0.12, z));
-      group.add(box(0.24, 0.08, 0.5, lacquerMat, x, HOUSE.eaveY - 0.26, z));
+    // ménsulas de madera (tokyō) bajo el alero lateral
+    for (let z = -hipZ + 0.3; z < hipZ; z += 0.85) {
+      group.add(box(0.34, 0.2, 0.16, darkWoodMat, sx * (hipX - 0.16), HOUSE.eaveY - 0.16, z));
+      group.add(box(0.42, 0.07, 0.24, lacquerMat, sx * (hipX - 0.18), HOUSE.eaveY - 0.28, z));
     }
   }
+
+  // aleros curvos: cada esquina se levanta, rasgo inconfundible de la pagoda
+  function curvedEave(axis, sign) {
+    const pts = [];
+    const half = axis === 'x' ? hipX : hipZ;
+    const fixed = axis === 'x' ? sign * hipZ : sign * hipX;
+    for (let i = 0; i <= 18; i++) {
+      const u = -half + (2 * half * i) / 18;
+      const edge = Math.abs(u) / half;
+      const lift = 0.34 * Math.pow(edge, 2.6);
+      const out = 0.14 * edge;
+      if (axis === 'x') {
+        pts.push(new THREE.Vector3(u, HOUSE.eaveY - 0.05 + lift, fixed + sign * out));
+      } else {
+        pts.push(new THREE.Vector3(fixed + sign * out, HOUSE.eaveY - 0.05 + lift, u));
+      }
+    }
+    const mesh = new THREE.Mesh(
+      new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.075, 6, false),
+      eaveMat,
+    );
+    mesh.castShadow = true;
+    group.add(mesh);
+  }
+  curvedEave('x', 1);
+  curvedEave('x', -1);
+  curvedEave('z', 1);
+  curvedEave('z', -1);
 
   /* ----------------------------------------------------------------- faldón */
   function makeRoofPlane(sign) {
@@ -196,8 +227,8 @@ export function createPagoda(textures) {
     const quat = new THREE.Quaternion().setFromRotationMatrix(
       new THREE.Matrix4().makeBasis(bx, up, nrm),
     );
-    const length = ROOF.slopeLength + (sign > 0 ? 0.06 : 0.24);
-    const width = HOUSE.width + ROOF.overhangX * 2 + 0.4;
+    const length = ROOF.slopeLength + 0.5;
+    const width = HOUSE.width + eaveOverhang * 2;
     const geo = new THREE.PlaneGeometry(width, length);
     const mat = kawaraMat.clone();
     mat.map = cloneRepeat(textures.kawara, 11, 3.4);
@@ -221,36 +252,45 @@ export function createPagoda(textures) {
   const roofNorth = makeRoofPlane(-1);
   group.add(roofSouth, roofNorth);
 
-  // cumbrera
-  group.add(
-    box(HOUSE.width + ROOF.overhangX * 2 + 0.6, 0.2, 0.44, ridgeMat, 0, ROOF.ridgeY + 0.09, 0),
-  );
+  // cumbrera y remates de latón (shibi) en ambos extremos
+  const ridgeLen = HOUSE.width + eaveOverhang * 2 + 0.3;
+  group.add(box(ridgeLen, 0.22, 0.5, ridgeMat, 0, ROOF.ridgeY + 0.1, 0));
+  for (const sx of [-1, 1]) {
+    const x = sx * (ridgeLen / 2 + 0.06);
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), brassMat);
+    ball.position.set(x, ROOF.ridgeY + 0.2, 0);
+    group.add(ball);
+    const finial = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.66, 6), brassMat);
+    finial.position.set(x, ROOF.ridgeY + 0.56, 0);
+    finial.rotation.z = -sx * 0.2;
+    finial.castShadow = true;
+    group.add(finial);
+  }
 
-  // aleros curvados en las cuatro esquinas
+  // cuernos de esquina: pequeños aleros que se rizan hacia arriba
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
-      const p0 = new THREE.Vector3(sx * (HOUSE.width / 2 + 0.3), HOUSE.eaveY + 0.02, sz * (HOUSE.depth / 2 + 0.14));
-      const p1 = new THREE.Vector3(sx * (HOUSE.width / 2 + 0.62), HOUSE.eaveY + 0.16, sz * (HOUSE.depth / 2 + 0.34));
-      const p2 = new THREE.Vector3(sx * (HOUSE.width / 2 + 0.86), HOUSE.eaveY + 0.52, sz * (HOUSE.depth / 2 + 0.5));
-      const curve = new THREE.CatmullRomCurve3([p0, p1, p2]);
-      const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 10, 0.055, 6, false), darkWoodMat);
-      tube.castShadow = true;
-      group.add(tube);
+      const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(sx * (hipX - 0.18), HOUSE.eaveY + 0.25, sz * (hipZ - 0.18)),
+        new THREE.Vector3(sx * hipX, HOUSE.eaveY + 0.33, sz * hipZ),
+        new THREE.Vector3(sx * (hipX + 0.22), HOUSE.eaveY + 0.62, sz * (hipZ + 0.22)),
+      ]);
+      const horn = new THREE.Mesh(new THREE.TubeGeometry(curve, 12, 0.07, 6, false), eaveMat);
+      horn.castShadow = true;
+      group.add(horn);
     }
   }
-  // remate del alero sur
-  group.add(box(HOUSE.width + 0.9, 0.12, 0.12, darkWoodMat, 0, HOUSE.eaveY - 0.02, HOUSE.depth / 2 + 0.22));
 
   /* ------------------------------------------------------------- ventanas */
   function addShoji(x, y, z, w, h, facing = 1) {
     const g = new THREE.Group();
-    g.add(box(w + 0.18, h + 0.18, 0.08, darkWoodMat, 0, 0, 0.02));
+    g.add(box(w + 0.18, h + 0.18, 0.08, lacquerMat, 0, 0, 0.02));
     g.add(plane(w, h, shojiMat, 0, 0, 0.07));
     for (let i = 1; i < 4; i++) {
-      g.add(box(0.028, h, 0.02, darkWoodMat, -w / 2 + (i * w) / 4, 0, 0.085));
+      g.add(box(0.028, h, 0.02, lacquerMat, -w / 2 + (i * w) / 4, 0, 0.085));
     }
     for (let i = 1; i < 3; i++) {
-      g.add(box(w, 0.028, 0.02, darkWoodMat, 0, -h / 2 + (i * h) / 3, 0.085));
+      g.add(box(w, 0.028, 0.02, lacquerMat, 0, -h / 2 + (i * h) / 3, 0.085));
     }
     if (facing < 0) g.rotation.y = Math.PI;
     g.position.set(x, y, z);
@@ -265,97 +305,111 @@ export function createPagoda(textures) {
 
   /* ------------------------------------------------------------------ puerta */
   const doorX = -0.35;
-  group.add(box(1.9, 2.34, 0.08, darkWoodMat, doorX, 1.42, HOUSE.depth / 2 + 0.04));
+  group.add(box(1.9, 2.34, 0.08, lacquerMat, doorX, 1.42, HOUSE.depth / 2 + 0.04));
   for (const s of [-1, 1]) {
     const panel = addShoji(doorX + s * 0.42, 1.4, HOUSE.depth / 2 + 0.14, 0.78, 2.06, 1);
     group.add(panel);
   }
-  group.add(box(0.08, 2.2, 0.14, darkWoodMat, doorX, 1.4, HOUSE.depth / 2 + 0.2));
+  group.add(box(0.08, 2.2, 0.14, lacquerMat, doorX, 1.4, HOUSE.depth / 2 + 0.2));
   // escalones de piedra
   group.add(box(2.3, 0.18, 0.6, stoneMat, doorX, 0.2, HOUSE.depth / 2 + 0.55));
   group.add(box(2.7, 0.14, 0.4, stoneMat, doorX, 0.08, HOUSE.depth / 2 + 0.95));
 
-  /* ------------------------------------------------------ cuerpos de pagoda */
-  const tierZ = -2.3;
+  /* ------------------------------------------- cuerpos superiores de la pagoda
+     Nacen de la cumbrera de la cubierta solar: ya no flotan sobre una casa.
+     La planta baja es el primer cuerpo (su tejado es donde van los paneles) y
+     sobre él se apilan dos cuerpos más, cada vez más pequeños. */
+  const tierZ = -0.55;
   const tiers = [
-    { w: 5.2, d: 3.8, h: 1.9, y: 5.9, roofR: 4.2, roofH: 1.7 },
-    { w: 4.0, d: 2.9, h: 1.5, y: 8.3, roofR: 3.3, roofH: 1.5 },
-    { w: 2.9, d: 2.1, h: 1.25, y: 10.3, roofR: 2.4, roofH: 1.3 },
+    { w: 5.4, d: 3.4, h: 1.9, y: 5.0, roofR: 4.8, roofH: 1.4 },
+    { w: 3.6, d: 2.4, h: 1.5, y: 8.7, roofR: 3.4, roofH: 1.15 },
   ];
 
-  tiers.forEach((t, index) => {
+  // faldón de unión entre la cumbrera y la primera plataforma (sin huecos)
+  group.add(box(6.0, 0.55, 4.0, darkWoodMat, 0, 5.05, tierZ));
+
+  tiers.forEach((t) => {
     const tier = new THREE.Group();
     tier.position.set(0, t.y, tierZ);
 
-    // plataforma y pilares lacados
-    tier.add(box(t.w + 0.6, 0.16, t.d + 0.6, darkWoodMat, 0, 0.08, 0));
+    // plataforma y balcón de madera
+    tier.add(box(t.w + 0.7, 0.14, t.d + 0.7, darkWoodMat, 0, 0.07, 0));
+    tier.add(box(t.w + 1.0, 0.1, t.d + 1.0, woodMat, 0, 0.18, 0));
+
+    // pilares lacados y muro de barro
     for (const sx of [-1, 1]) {
       for (const sz of [-1, 1]) {
-        tier.add(
-          box(0.14, t.h, 0.14, lacquerMat, sx * (t.w / 2), t.h / 2 + 0.16, sz * (t.d / 2)),
-        );
+        tier.add(box(0.15, t.h, 0.15, lacquerMat, sx * (t.w / 2), t.h / 2 + 0.22, sz * (t.d / 2)));
       }
     }
-    tier.add(box(t.w, t.h, t.d, plasterMat, 0, t.h / 2 + 0.16, 0));
+    tier.add(box(t.w, t.h, t.d, plasterMat, 0, t.h / 2 + 0.22, 0));
 
-    // ventanas shoji al frente
-    const nWin = index === 0 ? 3 : 2;
-    for (let i = 0; i < nWin; i++) {
-      const wx = (i - (nWin - 1) / 2) * (t.w / (nWin + 0.5));
-      tier.add(box(0.52, t.h * 0.6, 0.05, shojiMat, wx, t.h / 2 + 0.2, t.d / 2 + 0.04));
-      for (let k = 1; k < 3; k++) {
-        tier.add(
-          box(
-            0.02,
-            t.h * 0.6,
-            0.02,
-            darkWoodMat,
-            wx - 0.26 + (k * 0.52) / 3,
-            t.h / 2 + 0.2,
-            t.d / 2 + 0.07,
-          ),
-        );
+    // ventanas shoji en las cuatro caras
+    for (const sz of [-1, 1]) {
+      const nWin = sz > 0 ? (t.w > 4 ? 3 : 2) : 2;
+      for (let i = 0; i < nWin; i++) {
+        const wx = (i - (nWin - 1) / 2) * (t.w / (nWin + 0.6));
+        const win = new THREE.Group();
+        win.add(box(0.62, t.h * 0.58, 0.05, shojiMat, 0, 0, 0));
+        for (let k = 1; k < 4; k++) {
+          win.add(box(0.02, t.h * 0.58, 0.06, darkWoodMat, -0.31 + (k * 0.62) / 4, 0, 0.04));
+        }
+        for (let k = 1; k < 3; k++) {
+          win.add(box(0.62, 0.02, 0.06, darkWoodMat, 0, -t.h * 0.29 + (k * t.h * 0.58) / 3, 0.04));
+        }
+        win.position.set(wx, t.h / 2 + 0.26, sz * (t.d / 2 + 0.06));
+        if (sz < 0) win.rotation.y = Math.PI;
+        tier.add(win);
       }
     }
 
     // barandilla del balcón
-    for (let rx = -t.w / 2; rx <= t.w / 2; rx += 0.62) {
-      tier.add(box(0.04, 0.3, 0.04, darkWoodMat, rx, 0.3, t.d / 2 + 0.3));
+    for (let rx = -t.w / 2 - 0.4; rx <= t.w / 2 + 0.4; rx += 0.55) {
+      tier.add(box(0.04, 0.32, 0.04, darkWoodMat, rx, 0.35, t.d / 2 + 0.45));
     }
-    tier.add(box(t.w + 0.2, 0.045, 0.045, lacquerMat, 0, 0.46, t.d / 2 + 0.3));
+    tier.add(box(t.w + 0.9, 0.045, 0.045, lacquerMat, 0, 0.52, t.d / 2 + 0.45));
 
-    // canecillos y alero
-    tier.add(box(t.w + 1.0, 0.14, t.d + 1.0, darkWoodMat, 0, t.h + 0.22, 0));
-    for (let bx = -t.w / 2; bx <= t.w / 2 + 0.01; bx += 0.75) {
-      tier.add(box(0.12, 0.17, 0.34, darkWoodMat, bx, t.h + 0.07, t.d / 2 + 0.24));
-      tier.add(box(0.2, 0.07, 0.42, lacquerMat, bx, t.h - 0.05, t.d / 2 + 0.26));
+    // ménsulas (tokyō) bajo el alero
+    tier.add(box(t.w + 1.1, 0.14, t.d + 1.1, darkWoodMat, 0, t.h + 0.28, 0));
+    for (let bx = -t.w / 2 - 0.3; bx <= t.w / 2 + 0.3; bx += 0.7) {
+      tier.add(box(0.13, 0.18, 0.36, darkWoodMat, bx, t.h + 0.12, t.d / 2 + 0.3));
+      tier.add(box(0.22, 0.07, 0.44, lacquerMat, bx, t.h, t.d / 2 + 0.32));
     }
 
-    // tejado piramidal
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(t.roofR, t.roofH, 4, 1), kawaraMat);
+    // tejado pagoda: faldón acampanado y pirámide de teja kawara
+    const topR = t.roofR * 0.82;
+    const flare = new THREE.Mesh(
+      new THREE.CylinderGeometry(topR, t.roofR * 1.15, 0.34, 4, 1),
+      eaveMat,
+    );
+    flare.rotation.y = Math.PI / 4;
+    flare.position.y = t.h + 0.46;
+    flare.castShadow = true;
+    tier.add(flare);
+
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(topR, t.roofH, 4, 1), kawaraMat);
     roof.rotation.y = Math.PI / 4;
-    roof.position.y = t.h + 0.32 + t.roofH / 2;
+    roof.position.y = t.h + 0.63 + t.roofH / 2;
     roof.castShadow = true;
     roof.receiveShadow = true;
     tier.add(roof);
 
-    const eave = new THREE.Mesh(new THREE.ConeGeometry(t.roofR + 0.18, 0.26, 4, 1), ridgeMat);
-    eave.rotation.y = Math.PI / 4;
-    eave.position.y = t.h + 0.34;
-    eave.castShadow = true;
-    tier.add(eave);
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), brassMat);
+    knob.position.y = t.h + 0.63 + t.roofH;
+    tier.add(knob);
 
     group.add(tier);
   });
 
-  // remate (sorin)
-  const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.065, 1.5, 8), goldMat);
-  spire.position.set(0, 13.55, tierZ);
+  // remate (sorin) sobre el tejado superior
+  const spireBase = tiers[1].y + tiers[1].h + 0.63 + tiers[1].roofH;
+  const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 1.7, 8), goldMat);
+  spire.position.set(0, spireBase + 0.85, tierZ);
   group.add(spire);
-  for (let i = 0; i < 4; i++) {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.18 - i * 0.02, 0.022, 6, 16), goldMat);
+  for (let i = 0; i < 5; i++) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.2 - i * 0.025, 0.02, 6, 16), goldMat);
     ring.rotation.x = Math.PI / 2;
-    ring.position.set(0, 13.0 + i * 0.2, tierZ);
+    ring.position.set(0, spireBase + 0.25 + i * 0.22, tierZ);
     group.add(ring);
   }
 

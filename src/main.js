@@ -41,6 +41,7 @@ document.querySelectorAll('#theme-picker [data-theme]').forEach((btn) => {
 });
 
 if (isPagoda) {
+  document.body.classList.add('theme-pagoda');
   document.title = 'Pagoda Solar VR · Isla flotante';
   const introTitle = document.querySelector('#intro h1');
   if (introTitle) introTitle.innerHTML = 'PAGODA<br /><em>SOLAR</em> VR';
@@ -72,7 +73,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.98;
+renderer.toneMappingExposure = 0.34;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.xr.enabled = true;
@@ -115,6 +116,7 @@ const solar = createSolar({
   notify: (text, kind) => hud.toast(text, kind),
   onChange: () => game?.refreshAll(),
   onTarget: (slot) => hud.setState({ target: slot }),
+  onPlaced: () => game?.onPanelPlaced(),
 });
 
 const electrical = createElectrical({

@@ -253,6 +253,26 @@ export function createPPE({ scene, textures, bench, player, camera, notify, onCh
     return true;
   }
 
+  /** Retira una pieza equipada y la devuelve a la mesa de obra. */
+  function unequip(id) {
+    if (!equipped[id]) return false;
+    const item = items[id];
+    equipped[id] = false;
+    item.userData.state = 'bench';
+    item.userData.canGrab = true;
+    item.visible = true;
+    item.scale.setScalar(1);
+    item.userData.ppe.labelSprite.visible = true;
+    if (item.parent !== group) group.attach(item);
+    item.position.copy(item.userData.basePos);
+    item.quaternion.copy(item.userData.baseQuat);
+    held.delete(item);
+    syncVisuals();
+    notify?.(`Se te ha retirado el ${item.userData.ppe.label}: vuelve a ponértelo antes de subir.`, 'err');
+    onChange?.(equipped);
+    return true;
+  }
+
   function equipHeld() {
     for (const item of held) {
       if (item.userData.state === 'held') {
@@ -278,7 +298,7 @@ export function createPPE({ scene, textures, bench, player, camera, notify, onCh
     item.userData.state = 'held';
     item.userData.canGrab = false;
     held.add(item);
-    item.userData.labelSprite.visible = false;
+    item.userData.ppe.labelSprite.visible = false;
     controller.attach(item);
     item.position.set(0, -0.02, -0.16);
     item.quaternion.identity();
@@ -305,7 +325,7 @@ export function createPPE({ scene, textures, bench, player, camera, notify, onCh
       if (k < 1) requestAnimationFrame(anim);
       else {
         item.scale.setScalar(1);
-        item.userData.labelSprite.visible = true;
+        item.userData.ppe.labelSprite.visible = true;
       }
     };
     requestAnimationFrame(anim);
@@ -334,7 +354,7 @@ export function createPPE({ scene, textures, bench, player, camera, notify, onCh
       item.visible = true;
       item.userData.state = 'bench';
       item.userData.canGrab = true;
-      item.userData.labelSprite.visible = true;
+      item.userData.ppe.labelSprite.visible = true;
       item.scale.setScalar(1);
       if (item.parent !== group) group.attach(item);
       item.position.copy(item.userData.basePos);
@@ -358,6 +378,7 @@ export function createPPE({ scene, textures, bench, player, camera, notify, onCh
     entries,
     equipped,
     equip,
+    unequip,
     equipHeld,
     equipDirect,
     grab,

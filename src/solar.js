@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {
   ENERGY,
   GRID,
@@ -17,7 +18,7 @@ const _m = new THREE.Matrix4();
 /**
  * Paneles, guías, validación de huecos y modelo energético.
  */
-export function createSolar({ textures, house, world, camera, notify, onChange, onTarget }) {
+export function createSolar({ textures, house, world, camera, notify, onChange, onTarget, onPlaced }) {
   const group = new THREE.Group();
   group.name = 'solar';
   house.group.add(group);
@@ -106,7 +107,10 @@ export function createSolar({ textures, house, world, camera, notify, onChange, 
 
   function makePanel() {
     const g = new THREE.Group();
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(PANEL.width, PANEL.height, 0.035), frameMat);
+    const frame = new THREE.Mesh(
+      new RoundedBoxGeometry(PANEL.width, PANEL.height, 0.035, 2, 0.009),
+      frameMat,
+    );
     frame.castShadow = true;
     frame.receiveShadow = true;
     g.add(frame);
@@ -318,6 +322,7 @@ export function createSolar({ textures, house, world, camera, notify, onChange, 
       panel.position.copy(slot.position);
       panel.quaternion.copy(slot.quaternion);
       recompute();
+      onPlaced?.(slot);
     });
     setTarget(null);
     notify?.('Panel fijado a las guías. ¡Bien!', 'ok');
